@@ -417,3 +417,89 @@ El sistema maneja las siguientes estructuras financieras:
 ---
 
 **Fin del informe técnico del backend.**
+
+
+
+
+# sql schema
+
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.account_members (
+  account_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  role text DEFAULT 'member'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT account_members_pkey PRIMARY KEY (account_id, user_id),
+  CONSTRAINT account_members_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+  CONSTRAINT account_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.accounts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  owner_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT accounts_pkey PRIMARY KEY (id),
+  CONSTRAINT accounts_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.allocations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  wallet_id uuid,
+  budget_id uuid,
+  amount numeric NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT allocations_pkey PRIMARY KEY (id),
+  CONSTRAINT allocations_wallet_id_fkey FOREIGN KEY (wallet_id) REFERENCES public.wallets(id),
+  CONSTRAINT allocations_budget_id_fkey FOREIGN KEY (budget_id) REFERENCES public.budgets(id)
+);
+CREATE TABLE public.budgets (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  account_id uuid,
+  name text NOT NULL,
+  target numeric NOT NULL,
+  icon text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT budgets_pkey PRIMARY KEY (id),
+  CONSTRAINT budgets_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  name text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id),
+  CONSTRAINT profiles_user_fk FOREIGN KEY (id) REFERENCES public.users(id)
+);
+CREATE TABLE public.transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  account_id uuid,
+  from_wallet uuid,
+  to_wallet uuid,
+  amount numeric NOT NULL,
+  type text NOT NULL,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT transactions_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+  CONSTRAINT transactions_from_wallet_fkey FOREIGN KEY (from_wallet) REFERENCES public.wallets(id),
+  CONSTRAINT transactions_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
+  CONSTRAINT transactions_to_wallet_fkey FOREIGN KEY (to_wallet) REFERENCES public.wallets(id)
+);
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  email text NOT NULL UNIQUE,
+  password_hash text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.wallets (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  account_id uuid,
+  name text NOT NULL,
+  icon text,
+  balance numeric DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT wallets_pkey PRIMARY KEY (id),
+  CONSTRAINT wallets_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id)
+);

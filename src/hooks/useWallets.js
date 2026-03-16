@@ -39,8 +39,8 @@ export const useWallets = (accountId) => {
   }
 
   const deleteWallet = async (id) => {
-    const error = await walletsService.delete(id)
-    if (!error) {
+    const { error, success } = await walletsService.delete(id)
+    if (success && !error) {
       setWallets(prev => prev.filter(w => w.id !== id))
     }
     return { error }

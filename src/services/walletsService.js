@@ -27,10 +27,13 @@ export const walletsService = {
   },
 
   async delete(id) {
-    const { error } = await supabase
+    const response = await supabase
       .from('wallets')
       .delete()
       .eq('id', id)
-    return { error }
+
+    // Supabase returns 204 (No Content) on successful deletion
+    // In this case, error is null and data is null, which is success
+    return { error: response.error, success: !response.error }
   },
 }

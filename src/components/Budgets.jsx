@@ -1,101 +1,216 @@
-import { useState } from 'react'
-import { useBudgets } from '../hooks/useBudgets'
+
+import { useState } from 'react';
+import { useBudgets } from '../hooks/useBudgets';
+import { useAllocations } from '../hooks/useAllocations';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
+import { Button } from './ui/Button';
+import { ProgressBar } from './ui/ProgressBar';
+import { Input } from './ui/Input';
+
+const ICONS = {
+  plane: "✈️", laptop: "💻", book: "📚", home: "🏠", food: "🍽️",
+  car: "🚗", health: "💊", savings: "🐷", salary: "💼", emergency: "🛡️",
+  shopping: "🛍️", fun: "🎮", wallet: "👛", chart: "📊", gift: "🎁",
+  music: "🎵", sport: "⚽", pet: "🐾", baby: "🍼", travel: "🌍",
+};
+
+const TABS = [
+  { key: 'active', label: 'Active Goals' },
+  { key: 'met', label: 'Met Goals' },
+  { key: 'shared', label: 'Shared Budgets' },
+  { key: 'archived', label: 'Archived' },
+];
+
+function IconPicker({ value, onChange }) {
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium mb-2">Ícono</label>
+      <div className="grid grid-cols-6 gap-2">
+        {Object.entries(ICONS).map(([k, v]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onChange(k)}
+            className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center text-2xl transition-all hover:scale-105 ${
+              value === k ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Budgets({ accountId, setPage }) {
-  const { budgets, loading, error, createBudget, updateBudget, deleteBudget } = useBudgets(accountId)
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({ name: '', target: 0, icon: '💰' })
-  const [editing, setEditing] = useState(null)
+  const { budgets, loading: budgetsLoading, error: budgetsError, createBudget, updateBudget, deleteBudget } = useBudgets(accountId);
+  const { allocations, loading: allocationsLoading } = useAllocations(accountId);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({ name: '', target: 0, icon: 'savings' });
+  const [editing, setEditing] = useState(null);
+  const [activeTab, setActiveTab] = useState('active');
+
+  // Simulación de estados para demo visual
+  const getBudgetStatus = (budget) => {
+    if (budget.progress >= 1) return { label: 'Met Goal', color: 'bg-gray-400', text: 'text-gray-400' };
+    if (budget.progress >= 0.85) return { label: 'Almost There', color: 'bg-green-500', text: 'text-green-600' };
+    if (budget.progress < 0.3) return { label: 'On Track', color: 'bg-orange-400', text: 'text-orange-500' };
+    return { label: 'Active', color: 'bg-blue-600', text: 'text-blue-600' };
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
+    const dataToSubmit = {
+      ...formData,
+      icon: ICONS[formData.icon] || '💰'
+    };
     if (editing) {
-      await updateBudget(editing.id, formData)
-      setEditing(null)
+      await updateBudget(editing.id, dataToSubmit);
+      setEditing(null);
     } else {
-      await createBudget(formData)
+      await createBudget(dataToSubmit);
     }
-    setFormData({ name: '', target: 0, icon: '💰' })
-    setShowForm(false)
-  }
+    setFormData({ name: '', target: 0, icon: 'savings' });
+    setShowForm(false);
+  };
 
   const handleEdit = (budget) => {
-    setEditing(budget)
-    setFormData({ name: budget.name, target: budget.target, icon: budget.icon })
-    setShowForm(true)
-  }
+    setEditing(budget);
+    const iconKey = Object.keys(ICONS).find(key => ICONS[key] === budget.icon) || 'savings';
+    setFormData({ name: budget.name, target: budget.target, icon: iconKey });
+    setShowForm(true);
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este presupuesto?')) {
-      await deleteBudget(id)
+      await deleteBudget(id);
     }
-  }
+  };
 
-  if (loading) return <div>Cargando...</div>
-  if (error) return <div>Error: {error.message}</div>
+  if (budgetsLoading || allocationsLoading) return <div className="p-8">Cargando...</div>;
+  if (budgetsError) return <div className="p-8 text-red-500">Error: {budgetsError.message}</div>;
+
+  // Calcular valores reales de current y progress basados en allocations
+  const budgetsWithProgress = budgets.map((budget) => {
+    const budgetAllocations = allocations.filter(allocation => allocation.budget_id === budget.id);
+    const current = budgetAllocations.reduce((sum, allocation) => sum + (allocation.amount || 0), 0);
+    const progress = budget.target > 0 ? current / budget.target : 0;
+    return {
+      ...budget,
+      current,
+      progress: Math.min(progress, 1), // Limitar a 100% máximo
+    };
+  });
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h2>Presupuestos</h2>
-      <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8 }}>
-        Nuevo Presupuesto
-      </button>
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold mb-1">Savings Goals</h1>
+          <p className="text-muted-foreground text-sm">Track and manage your long-term financial objectives.</p>
+        </div>
+        <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow" >
+          + Create Budget
+        </Button>
+      </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} style={{ marginTop: '20px', background: '#fff', padding: '20px', borderRadius: 8 }}>
-          <h3>{editing ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h3>
-          <input
-            type="text"
-            placeholder="Nombre"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
-            style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
-          />
-          <input
-            type="number"
-            placeholder="Objetivo"
-            value={formData.target}
-            onChange={(e) => setFormData({ ...formData, target: parseFloat(e.target.value) })}
-            required
-            style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
-          />
-          <input
-            type="text"
-            placeholder="Ícono"
-            value={formData.icon}
-            onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-            style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
-          />
-          <button type="submit" style={{ padding: '10px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8 }}>
-            {editing ? 'Actualizar' : 'Crear'}
+      {/* Tabs */}
+      <div className="flex gap-8 border-b mb-8">
+        {TABS.map(tab => (
+          <button
+            key={tab.key}
+            className={`pb-3 px-1 text-base font-medium border-b-2 transition-colors ${activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-600'}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label} {tab.key === 'active' && <span className="ml-1 text-xs bg-blue-100 text-blue-600 rounded px-2">{budgetsWithProgress.length}</span>}
           </button>
-          <button type="button" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: '💰' }) }} style={{ marginLeft: '10px', padding: '10px 20px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8 }}>
-            Cancelar
-          </button>
-        </form>
-      )}
-
-      <div style={{ marginTop: '20px' }}>
-        {budgets.map(budget => (
-          <div key={budget.id} style={{ background: '#fff', padding: '16px', marginBottom: '12px', borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h3>{budget.icon} {budget.name}</h3>
-            <p>Objetivo: ${budget.target}</p>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <button onClick={() => handleEdit(budget)} style={{ padding: '5px 10px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 4 }}>
-                Editar
-              </button>
-              <button onClick={() => handleDelete(budget.id)} style={{ padding: '5px 10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4 }}>
-                Eliminar
-              </button>
-            </div>
-          </div>
         ))}
       </div>
 
-      <button onClick={() => setPage('dashboard')} style={{ marginTop: '20px', padding: '10px 20px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 8 }}>
-        Volver al Dashboard
-      </button>
+      {/* Grid de Budgets */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {budgetsWithProgress.map((budget, idx) => {
+          const status = getBudgetStatus(budget);
+          return (
+            <Card key={budget.id || idx} className="relative group">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <span className="text-3xl">{budget.icon || '💰'}</span>
+                {status.label && (
+                  <span className={`text-xs font-semibold px-2 py-1 rounded ${status.text} bg-gray-100`}>{status.label}</span>
+                )}
+              </CardHeader>
+              <CardContent className="pt-0">
+                <CardTitle className="text-lg mb-2 flex items-center gap-2">
+                  {budget.name}
+                </CardTitle>
+                <div className="mb-2">
+                  <ProgressBar value={Math.round(budget.progress * 100)} color={status.color} />
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className="font-semibold">Progress</span>
+                    <span className="font-semibold">{Math.round(budget.progress * 100)}%</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-end mb-2">
+                  <div>
+                    <span className="block text-xs text-muted-foreground">CURRENT / GOAL</span>
+                    <span className="font-bold text-base">${budget.current.toLocaleString()} / ${budget.target.toLocaleString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => handleEdit(budget)}>Edit</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+        {/* Add New Budget Card */}
+        <Card className="flex flex-col items-center justify-center border-dashed border-2 min-h-[200px] cursor-pointer hover:bg-gray-50 transition" onClick={() => setShowForm(true)}>
+          <div className="flex flex-col items-center">
+            <span className="text-3xl mb-2">+</span>
+            <span className="font-semibold">Add New Budget</span>
+            <span className="text-xs text-muted-foreground mt-1">Set a new savings goal and start tracking your progress today.</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* Modal/Formulario */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative">
+            <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h3>
+            <div className="mb-4">
+              <label className="block text-sm mb-1">Nombre</label>
+              <Input
+                type="text"
+                placeholder="Nombre"
+                value={formData.name}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm mb-1">Objetivo</label>
+              <Input
+                type="number"
+                placeholder="Objetivo"
+                value={formData.target}
+                onChange={e => setFormData({ ...formData, target: parseFloat(e.target.value) })}
+                required
+                min={1}
+              />
+            </div>
+            <IconPicker
+              value={formData.icon}
+              onChange={(icon) => setFormData({ ...formData, icon })}
+            />
+            <div className="flex gap-2 justify-end">
+              <Button type="submit">{editing ? 'Actualizar' : 'Crear'}</Button>
+              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'savings' }) }}>Cancelar</Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
-  )
+  );
 }

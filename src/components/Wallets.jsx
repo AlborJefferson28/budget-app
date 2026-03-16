@@ -4,14 +4,21 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Search, Plus, Edit, Trash2 } from 'lucide-react'
+import WalletDetail from './WalletDetail'
+
+const iconOptions = [
+  '💰', '🏦', '💳', '📱', '💸', '🤑', '💵', '💎', '🏆', '🎯', '🚀', '🌟',
+  '💼', '🛒', '🏠', '🚗', '✈️', '🍔', '🎮', '📚', '🎵', '🏃', '💪', '❤️'
+]
 
 export default function Wallets({ accountId, setPage }) {
-  const { wallets, loading, error, createWallet, updateWallet, deleteWallet } = useWallets(accountId)
+  const { wallets, loading, error, createWallet, updateWallet, deleteWallet, refetch } = useWallets(accountId)
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ name: '', icon: '💰', balance: 0 })
   const [editing, setEditing] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState('Todas')
+  const [selectedWallet, setSelectedWallet] = useState(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -33,8 +40,9 @@ export default function Wallets({ accountId, setPage }) {
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar esta billetera?')) {
-      await deleteWallet(id)
+      return await deleteWallet(id)
     }
+    return { error: null }
   }
 
   const filteredWallets = wallets.filter(wallet => {
@@ -45,6 +53,18 @@ export default function Wallets({ accountId, setPage }) {
 
   if (loading) return <div className="flex justify-center items-center h-64">Cargando...</div>
   if (error) return <div className="text-red-500">Error: {error.message}</div>
+
+  if (selectedWallet) {
+    return (
+      <WalletDetail
+        wallet={selectedWallet}
+        onBack={() => { setSelectedWallet(null); refetch(); }}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        updateWallet={updateWallet}
+      />
+    )
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -90,7 +110,7 @@ export default function Wallets({ accountId, setPage }) {
         </Card>
 
         {filteredWallets.map(wallet => (
-          <Card key={wallet.id} className="hover:shadow-lg transition-shadow">
+          <Card key={wallet.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setSelectedWallet(wallet)}>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2">
                 <span className="text-2xl">{wallet.icon}</span>
@@ -100,11 +120,17 @@ export default function Wallets({ accountId, setPage }) {
             <CardContent>
               <p className="text-2xl font-bold text-green-600 mb-4">${wallet.balance}</p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleEdit(wallet)}>
+                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEdit(wallet); }}>
                   <Edit className="w-4 h-4 mr-1" />
                   Editar
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleDelete(wallet.id)}>
+                <Button variant="outline" size="sm" onClick={async (e) => {
+                  e.stopPropagation();
+                  const result = await handleDelete(wallet.id);
+                  if (result.error) {
+                    alert('Error al eliminar la billetera: ' + result.error.message);
+                  }
+                }}>
                   <Trash2 className="w-4 h-4 mr-1" />
                   Eliminar
                 </Button>
@@ -129,12 +155,30 @@ export default function Wallets({ accountId, setPage }) {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
-                <Input
-                  type="text"
-                  placeholder="Ícono"
-                  value={formData.icon}
-                  onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                />
+                <div>
+                  <label className="block text-sm font-medium mb-2">Ícono</label>
+                  <Input
+                    type="text"
+                    placeholder="Ícono personalizado"
+                    value={formData.icon}
+                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                    className="mb-2"
+                  />
+                  <div className="grid grid-cols-6 gap-2">
+                    {iconOptions.map((icon) => (
+                      <Button
+                        key={icon}
+                        type="button"
+                        variant={formData.icon === icon ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setFormData({ ...formData, icon })}
+                        className="text-lg"
+                      >
+                        {icon}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
                 <Input
                   type="number"
                   placeholder="Balance"

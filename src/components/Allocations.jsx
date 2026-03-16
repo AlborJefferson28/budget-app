@@ -1,117 +1,271 @@
-import { useState } from 'react'
-import { useAllocations } from '../hooks/useAllocations'
-import { useWallets } from '../hooks/useWallets'
-import { useBudgets } from '../hooks/useBudgets'
+
+import { useState, useMemo } from 'react';
+import { useAllocations } from '../hooks/useAllocations';
+import { useWallets } from '../hooks/useWallets';
+import { useBudgets } from '../hooks/useBudgets';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/Select';
+
+const STATUS = {
+  completed: { label: 'Completed', color: 'bg-green-100 text-green-700' },
+  processing: { label: 'Processing', color: 'bg-blue-100 text-blue-700' },
+};
+
+function getStatus(idx) {
+  // Demo: alternar entre completado y processing
+  return idx % 3 === 2 ? 'processing' : 'completed';
+}
 
 export default function Allocations({ accountId, setPage }) {
-  const { allocations, loading, error, createAllocation, updateAllocation, deleteAllocation } = useAllocations(accountId)
-  const { wallets } = useWallets(accountId)
-  const { budgets } = useBudgets(accountId)
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({ wallet_id: '', budget_id: '', amount: 0 })
-  const [editing, setEditing] = useState(null)
+  const { allocations, loading, error, createAllocation, updateAllocation, deleteAllocation } = useAllocations(accountId);
+  const { wallets } = useWallets(accountId);
+  const { budgets } = useBudgets(accountId);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({ wallet_id: '', budget_id: '', amount: 0 });
+  const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState('');
+  const [page, setPageNum] = useState(1);
+  const pageSize = 4;
+
+  // Filtros y paginación
+  const filtered = useMemo(() => {
+    if (!search) return allocations;
+    return allocations.filter(a => {
+      const wallet = a.wallets?.name?.toLowerCase() || '';
+      const budget = a.budgets?.name?.toLowerCase() || '';
+      return wallet.includes(search.toLowerCase()) || budget.includes(search.toLowerCase());
+    });
+  }, [allocations, search]);
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  // Resúmenes con valores más dinámicos y actuales
+  const totalAllocated = useMemo(() => allocations.reduce((sum, a) => sum + (a.amount || 0), 0), [allocations]);
+  const totalWalletBalance = useMemo(() => wallets.reduce((sum, w) => sum + (w.balance || 0), 0), [wallets]);
+  const allocationPercentage = useMemo(() => totalWalletBalance > 0 ? (totalAllocated / totalWalletBalance) * 100 : 0, [totalAllocated, totalWalletBalance]);
+
+  const mostActiveWallet = useMemo(() => {
+    if (allocations.length === 0) return { name: '-', count: 0 };
+    const walletCount = {};
+    allocations.forEach(a => {
+      if (a.wallets?.name) walletCount[a.wallets.name] = (walletCount[a.wallets.name] || 0) + 1;
+    });
+    const [name, allocationCount] = Object.entries(walletCount).sort((a, b) => b[1] - a[1])[0] || ['-', 0];
+    return { name, count: allocationCount };
+  }, [allocations]);
+
+  const budgetCoverage = useMemo(() => {
+    if (budgets.length === 0) return 0;
+    const uniqueBudgets = new Set(allocations.map(a => a.budget_id).filter(id => id));
+    return Math.round((uniqueBudgets.size / budgets.length) * 100);
+  }, [allocations, budgets]);
+
+  const averageAllocation = useMemo(() => {
+    return allocations.length > 0 ? totalAllocated / allocations.length : 0;
+  }, [totalAllocated, allocations]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     if (editing) {
-      await updateAllocation(editing.id, formData)
-      setEditing(null)
+      await updateAllocation(editing.id, formData);
+      setEditing(null);
     } else {
-      await createAllocation(formData)
+      await createAllocation(formData);
     }
-    setFormData({ wallet_id: '', budget_id: '', amount: 0 })
-    setShowForm(false)
-  }
+    setFormData({ wallet_id: '', budget_id: '', amount: 0 });
+    setShowForm(false);
+  };
 
   const handleEdit = (allocation) => {
-    setEditing(allocation)
+    setEditing(allocation);
     setFormData({
       wallet_id: allocation.wallet_id,
       budget_id: allocation.budget_id,
-      amount: allocation.amount
-    })
-    setShowForm(true)
-  }
+      amount: allocation.amount,
+    });
+    setShowForm(true);
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar esta asignación?')) {
-      await deleteAllocation(id)
+      await deleteAllocation(id);
     }
-  }
+  };
 
-  if (loading) return <div>Cargando...</div>
-  if (error) return <div>Error: {error.message}</div>
+  if (loading) return <div className="p-8">Cargando...</div>;
+  if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h2>Asignaciones</h2>
-      <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8 }}>
-        Nueva Asignación
-      </button>
-
-      {showForm && (
-        <form onSubmit={handleSubmit} style={{ marginTop: '20px', background: '#fff', padding: '20px', borderRadius: 8 }}>
-          <h3>{editing ? 'Editar Asignación' : 'Nueva Asignación'}</h3>
-          <select
-            value={formData.wallet_id}
-            onChange={(e) => setFormData({ ...formData, wallet_id: e.target.value })}
-            required
-            style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
-          >
-            <option value="">Seleccionar billetera</option>
-            {wallets.map(wallet => (
-              <option key={wallet.id} value={wallet.id}>{wallet.name}</option>
-            ))}
-          </select>
-          <select
-            value={formData.budget_id}
-            onChange={(e) => setFormData({ ...formData, budget_id: e.target.value })}
-            required
-            style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
-          >
-            <option value="">Seleccionar presupuesto</option>
-            {budgets.map(budget => (
-              <option key={budget.id} value={budget.id}>{budget.name}</option>
-            ))}
-          </select>
-          <input
-            type="number"
-            placeholder="Monto"
-            value={formData.amount}
-            onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
-            required
-            style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
-          />
-          <button type="submit" style={{ padding: '10px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8 }}>
-            {editing ? 'Actualizar' : 'Crear'}
-          </button>
-          <button type="button" onClick={() => { setShowForm(false); setEditing(null); setFormData({ wallet_id: '', budget_id: '', amount: 0 }) }} style={{ marginLeft: '10px', padding: '10px 20px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8 }}>
-            Cancelar
-          </button>
-        </form>
-      )}
-
-      <div style={{ marginTop: '20px' }}>
-        {allocations.map(allocation => (
-          <div key={allocation.id} style={{ background: '#fff', padding: '16px', marginBottom: '12px', borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <p>Billetera: {allocation.wallets?.name}</p>
-            <p>Presupuesto: {allocation.budgets?.name}</p>
-            <p>Monto: ${allocation.amount}</p>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <button onClick={() => handleEdit(allocation)} style={{ padding: '5px 10px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 4 }}>
-                Editar
-              </button>
-              <button onClick={() => handleDelete(allocation.id)} style={{ padding: '5px 10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4 }}>
-                Eliminar
-              </button>
-            </div>
-          </div>
-        ))}
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold mb-1">Allocations</h1>
+          <p className="text-muted-foreground text-sm">Distribute funds across your budget categories.</p>
+        </div>
+        <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow">
+          + New Allocation
+        </Button>
       </div>
 
-      <button onClick={() => setPage('dashboard')} style={{ marginTop: '20px', padding: '10px 20px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: 8 }}>
-        Volver al Dashboard
-      </button>
+      {/* Search */}
+      <div className="mb-4">
+        <Input
+          type="text"
+          placeholder="Search transfers, wallets..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPageNum(1); }}
+          className="max-w-md"
+        />
+      </div>
+
+      {/* Tabla de asignaciones */}
+      <Card className="mb-8">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  <th className="py-3 px-6 text-left font-semibold">ORIGIN WALLET</th>
+                  <th className="py-3 px-6 text-left font-semibold">DESTINATION BUDGET</th>
+                  <th className="py-3 px-6 text-left font-semibold">AMOUNT</th>
+                  <th className="py-3 px-6 text-left font-semibold">DATE</th>
+                  <th className="py-3 px-6 text-left font-semibold">STATUS</th>
+                  <th className="py-3 px-6"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((allocation, idx) => (
+                  <tr key={allocation.id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                    <td className="py-3 px-6 flex items-center gap-3">
+                      <span className="text-2xl">{allocation.wallets?.icon || '💰'}</span>
+                      <div>
+                        <div className="font-semibold">{allocation.wallets?.name}</div>
+                        <div className="text-xs text-muted-foreground">{allocation.wallets?.type || ''}</div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-6 flex items-center gap-3">
+                      <span className="text-2xl">{allocation.budgets?.icon || '🏷️'}</span>
+                      <div>
+                        <div className="font-semibold">{allocation.budgets?.name}</div>
+                        <div className="text-xs text-muted-foreground">{allocation.budgets?.description || ''}</div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-6 font-bold">${allocation.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="py-3 px-6">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</td>
+                    <td className="py-3 px-6">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
+                    </td>
+                    <td className="py-3 px-6 flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(allocation)}>Edit</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)}>Delete</Button>
+                    </td>
+                  </tr>
+                ))}
+                {paged.length === 0 && (
+                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No allocations found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between px-6 py-3 text-xs text-muted-foreground border-t">
+            <span>Showing {paged.length} of {filtered.length} allocations</span>
+            <div className="flex gap-1">
+              {[...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i}
+                  className={`w-8 h-8 rounded flex items-center justify-center border ${page === i + 1 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}
+                  onClick={() => setPageNum(i + 1)}
+                >{i + 1}</button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Resúmenes */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <Card>
+          <CardContent className="py-6">
+            <div className="text-xs text-muted-foreground mb-1">Total Allocated</div>
+            <div className="text-2xl font-bold text-blue-700">${totalAllocated.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            <div className="text-xs text-muted-foreground mt-1">{allocationPercentage.toFixed(1)}% of total wallet balance</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-6">
+            <div className="text-xs text-muted-foreground mb-1">Most Active Wallet</div>
+            <div className="text-xl font-bold">{mostActiveWallet.name}</div>
+            <div className="text-xs text-muted-foreground mt-1">{mostActiveWallet.count} allocations</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-6">
+            <div className="text-xs text-muted-foreground mb-1">Budget Coverage</div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold">{budgetCoverage}%</span>
+            </div>
+            <div className="mt-2 w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${budgetCoverage}%` }} />
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">{new Set(allocations.map(a => a.budget_id).filter(id => id)).size} / {budgets.length} budgets</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-6">
+            <div className="text-xs text-muted-foreground mb-1">Average Allocation</div>
+            <div className="text-2xl font-bold text-green-700">${averageAllocation.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            <div className="text-xs text-muted-foreground mt-1">Per allocation</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Modal/Formulario */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative">
+            <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Asignación' : 'Nueva Asignación'}</h3>
+            <div className="mb-4">
+              <label className="block text-sm mb-1">Billetera Origen</label>
+              <Select value={formData.wallet_id} onValueChange={v => setFormData({ ...formData, wallet_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar billetera" /></SelectTrigger>
+                <SelectContent>
+                  {wallets.map(wallet => (
+                    <SelectItem key={wallet.id} value={wallet.id}>{wallet.icon} {wallet.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm mb-1">Presupuesto Destino</label>
+              <Select value={formData.budget_id} onValueChange={v => setFormData({ ...formData, budget_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar presupuesto" /></SelectTrigger>
+                <SelectContent>
+                  {budgets.map(budget => (
+                    <SelectItem key={budget.id} value={budget.id}>{budget.icon} {budget.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm mb-1">Monto</label>
+              <Input
+                type="number"
+                placeholder="Monto"
+                value={formData.amount}
+                onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                required
+                min={1}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="submit">{editing ? 'Actualizar' : 'Crear'}</Button>
+              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditing(null); setFormData({ wallet_id: '', budget_id: '', amount: 0 }) }}>Cancelar</Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
-  )
+  );
 }
