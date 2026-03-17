@@ -8,11 +8,14 @@ export const usersService = {
     }
 
     const { data, error } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('email', normalizedEmail)
-      .maybeSingle()
+      .rpc('find_user_by_email', { p_email: normalizedEmail })
 
-    return { data, error }
+    if (error) return { data: null, error }
+
+    if (!data || data.length === 0) {
+      return { data: null, error: null }
+    }
+
+    return { data: data[0], error: null }
   },
 }
