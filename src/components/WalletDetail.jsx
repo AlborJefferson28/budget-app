@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTransactions } from '../hooks/useTransactions'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/Card'
 import { Button } from './ui/Button'
@@ -12,24 +12,69 @@ const iconOptions = [
   '💼', '🛒', '🏠', '🚗', '✈️', '🍔', '🎮', '📚', '🎵', '🏃', '💪', '❤️'
 ]
 
-export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateWallet }) {
+const COP_NUMBER_FORMATTER = new Intl.NumberFormat('es-CO', {
+  maximumFractionDigits: 0,
+})
+
+const normalizeCOPAmount = (value) => {
+  const parsed = parseCOP(value)
+  return Math.max(0, Math.round(parsed))
+}
+
+const formatCOPNumber = (value) => COP_NUMBER_FORMATTER.format(normalizeCOPAmount(value))
+
+const formatDateLabel = (value) => {
+  if (!value) return 'Sin datos'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'Sin datos'
+  return parsed.toLocaleDateString('es-CO', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  })
+}
+
+export default function WalletDetail({ wallet, onBack, onDelete, updateWallet }) {
   const { transactions, loading: transactionsLoading } = useTransactions(wallet.account_id)
-  const [showQR, setShowQR] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [currentWallet, setCurrentWallet] = useState(wallet)
+  const [editError, setEditError] = useState('')
+  const [editNotice, setEditNotice] = useState('')
   const [editForm, setEditForm] = useState({
     name: wallet.name,
     icon: wallet.icon,
-    balance: wallet.balance
+    balanceInput: formatCOPNumber(wallet.balance)
   })
 
-  // Filtrar transacciones de esta wallet
+  useEffect(() => {
+    setCurrentWallet(wallet)
+    setEditForm({
+      name: wallet.name,
+      icon: wallet.icon,
+      balanceInput: formatCOPNumber(wallet.balance),
+    })
+    setIsEditing(false)
+    setEditError('')
+    setEditNotice('')
+  }, [wallet])
+
   const walletTransactions = transactions.filter(t =>
-    t.from_wallet === wallet.id || t.to_wallet === wallet.id
-  ).slice(0, 5) // Últimas 5
+    t.from_wallet === currentWallet.id || t.to_wallet === currentWallet.id
+  ).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const recentWalletTransactions = walletTransactions.slice(0, 5)
+  const latestActivity = walletTransactions[0]?.created_at || currentWallet.created_at
+
+  const applyBalanceQuickAmount = (amount) => {
+    const nextValue = normalizeCOPAmount(editForm.balanceInput) + amount
+    setEditForm(prev => ({
+      ...prev,
+      balanceInput: formatCOPNumber(nextValue),
+    }))
+  }
 
   const handleDelete = async () => {
     if (window.confirm('¿Estás seguro de eliminar esta billetera?')) {
-      const result = await onDelete(wallet.id)
+      const result = await onDelete(currentWallet.id)
       if (!result.error) {
         onBack()
       } else {
@@ -39,19 +84,41 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
   }
 
   const handleEditToggle = () => {
+    setEditError('')
+    setEditNotice('')
     if (isEditing) {
-      // Cancelar
       setEditForm({
-        name: wallet.name,
-        icon: wallet.icon,
-        balance: wallet.balance
+        name: currentWallet.name,
+        icon: currentWallet.icon,
+        balanceInput: formatCOPNumber(currentWallet.balance),
       })
     }
     setIsEditing(!isEditing)
   }
 
   const handleSave = async () => {
-    await updateWallet(wallet.id, editForm)
+    const payload = {
+      name: editForm.name.trim(),
+      icon: editForm.icon,
+      balance: normalizeCOPAmount(editForm.balanceInput),
+    }
+
+    if (!payload.name) {
+      setEditError('El nombre de la wallet es obligatorio.')
+      return
+    }
+
+    setEditError('')
+    setEditNotice('')
+    const { data, error } = await updateWallet(currentWallet.id, payload)
+
+    if (error) {
+      setEditError(error.message || 'No se pudo actualizar la wallet.')
+      return
+    }
+
+    setCurrentWallet(data?.[0] || { ...currentWallet, ...payload })
+    setEditNotice('Wallet actualizada correctamente.')
     setIsEditing(false)
   }
 
@@ -86,7 +153,7 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className="text-4xl">{wallet.icon}</span>
+                    <span className="text-4xl">{currentWallet.icon}</span>
                   )}
                   <div className="min-w-0">
                     {isEditing ? (
@@ -96,9 +163,9 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
                         className="text-2xl font-bold"
                       />
                     ) : (
-                      <CardTitle className="text-2xl">{wallet.name}</CardTitle>
+                      <CardTitle className="text-2xl">{currentWallet.name}</CardTitle>
                     )}
-                    <CardDescription>Wallet ID: {wallet.id}</CardDescription>
+                    <CardDescription>Wallet ID: {currentWallet.id}</CardDescription>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -129,31 +196,61 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
               </div>
             </CardHeader>
             <CardContent>
+              {editError && (
+                <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {editError}
+                </div>
+              )}
+              {editNotice && (
+                <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  {editNotice}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div>
                   <p className="text-sm text-gray-500">Balance</p>
                   {isEditing ? (
-                    <Input
-                      type="number"
-                      value={editForm.balance}
-                      onChange={(e) => setEditForm({ ...editForm, balance: parseCOP(e.target.value) })}
-                      className="text-3xl font-bold"
-                    />
+                    <div>
+                      <Input
+                        type="text"
+                        value={editForm.balanceInput}
+                        onChange={(e) => setEditForm({ ...editForm, balanceInput: e.target.value })}
+                        onBlur={() => setEditForm(prev => ({ ...prev, balanceInput: formatCOPNumber(prev.balanceInput) }))}
+                        className="text-2xl font-bold"
+                      />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {[10000, 50000, 100000].map((quickAmount) => (
+                          <Button
+                            key={quickAmount}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => applyBalanceQuickAmount(quickAmount)}
+                          >
+                            + {formatCOP(quickAmount)}
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(editForm.balanceInput))}</span>
+                      </p>
+                    </div>
                   ) : (
-                    <p className="text-3xl font-bold text-green-600">{formatCOP(wallet.balance)}</p>
+                    <p className="text-3xl font-bold text-green-600">{formatCOP(currentWallet.balance)}</p>
                   )}
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Tipo</p>
-                  <p className="text-lg">{wallet.type || 'Fiat'}</p>
+                  <p className="text-sm text-gray-500">Moneda</p>
+                  <p className="text-lg">COP</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Moneda</p>
-                  <p className="text-lg">USD</p>
+                  <p className="text-sm text-gray-500">Creada</p>
+                  <p className="text-lg">{formatDateLabel(currentWallet.created_at)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Última actividad</p>
-                  <p className="text-lg">Hace 2 días</p>
+                  <p className="text-lg">{formatDateLabel(latestActivity)}</p>
                 </div>
               </div>
 
@@ -174,9 +271,9 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
             <CardContent>
               {transactionsLoading ? (
                 <p>Cargando transacciones...</p>
-              ) : walletTransactions.length > 0 ? (
+              ) : recentWalletTransactions.length > 0 ? (
                 <div className="space-y-3">
-                  {walletTransactions.map(transaction => (
+                  {recentWalletTransactions.map(transaction => (
                     <div key={transaction.id} className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center p-3 border rounded-lg">
                       <div>
                         <p className="font-medium">
@@ -186,8 +283,8 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
                           {new Date(transaction.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <p className={`font-bold ${transaction.to_wallet === wallet.id ? 'text-green-600' : 'text-red-600'}`}>
-                        {transaction.to_wallet === wallet.id ? '+' : '-'}{formatCOP(transaction.amount)}
+                      <p className={`font-bold ${transaction.to_wallet === currentWallet.id ? 'text-green-600' : 'text-red-600'}`}>
+                        {transaction.to_wallet === currentWallet.id ? '+' : '-'}{formatCOP(transaction.amount)}
                       </p>
                     </div>
                   ))}

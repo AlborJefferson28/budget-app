@@ -1,4 +1,4 @@
-import { LayoutDashboard, Wallet, ArrowLeftRight, Target, PieChart, Users } from 'lucide-react'
+import { LayoutDashboard, Wallet, ArrowLeftRight, Target, PieChart, Users, Settings } from 'lucide-react'
 import UserCard from './UserCard'
 
 export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSelectedAccount, selectedAccount, signOut, accounts, isMobile, user }) {
@@ -9,6 +9,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
     { name: 'Budgets', page: 'budgets', icon: Target },
     { name: 'Allocations', page: 'allocations', icon: PieChart },
     { name: 'Accounts', page: 'accounts', icon: Users },
+    { name: 'Profile & Settings', page: 'profile', icon: Settings },
   ]
 
   const handleItemClick = (page) => {

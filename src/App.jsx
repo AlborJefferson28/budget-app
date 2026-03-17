@@ -9,6 +9,7 @@ import Wallets from './components/Wallets'
 import Transactions from './components/Transactions'
 import Budgets from './components/Budgets'
 import Allocations from './components/Allocations'
+import ProfileSettings from './components/ProfileSettings'
 import Sidebar from './components/Sidebar'
 import { useAccounts } from './hooks/useAccounts'
 
@@ -80,6 +81,8 @@ function App() {
         return <Budgets accountId={activeAccountId} setPage={setCurrentPage} />
       case 'allocations':
         return <Allocations accountId={activeAccountId} setPage={setCurrentPage} />
+      case 'profile':
+        return <ProfileSettings />
       default:
         return <Dashboard setPage={setCurrentPage} setSelectedAccount={setSelectedAccount} accountId={activeAccountId} />
     }

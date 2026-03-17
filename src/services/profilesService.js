@@ -18,6 +18,14 @@ export const profilesService = {
     return { data, error }
   },
 
+  async upsert(profile) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert(profile, { onConflict: 'id' })
+      .select()
+    return { data, error }
+  },
+
   async update(userId, updates) {
     const { data, error } = await supabase
       .from('profiles')
