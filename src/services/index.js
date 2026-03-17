@@ -1,5 +1,6 @@
 export { accountsService } from './accountsService'
 export { accountMembersService } from './accountMembersService'
+export { usersService } from './usersService'
 export { walletsService } from './walletsService'
 export { transactionsService } from './transactionsService'
 export { budgetsService } from './budgetsService'

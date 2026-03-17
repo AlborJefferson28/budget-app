@@ -74,10 +74,10 @@ export default function Transactions({ accountId, setPage }) {
   if (error) return <div className="text-red-500">Error: {error.message}</div>
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Transacciones</h1>
-        <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl sm:text-3xl font-bold">Transacciones</h1>
+        <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Nueva Transacción
         </Button>
@@ -94,13 +94,14 @@ export default function Transactions({ accountId, setPage }) {
             className="pl-10"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {['Todas', 'Transferencias', 'Ingresos', 'Gastos'].map((f) => (
             <Button
               key={f}
               variant={filter === f ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter(f)}
+              className="shrink-0"
             >
               {f}
             </Button>
@@ -137,7 +138,7 @@ export default function Transactions({ accountId, setPage }) {
               <p className="text-sm text-gray-500 mb-4">
                 {new Date(transaction.created_at).toLocaleDateString()}
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={() => handleEdit(transaction)}>
                   <Edit className="w-4 h-4 mr-1" />
                   Editar
@@ -153,8 +154,8 @@ export default function Transactions({ accountId, setPage }) {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>{editing ? 'Editar Transacción' : 'Nueva Transacción'}</CardTitle>
             </CardHeader>
@@ -201,11 +202,11 @@ export default function Transactions({ accountId, setPage }) {
                     <SelectItem value="expense">Gasto</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="flex gap-2">
-                  <Button type="submit">
+                <div className="flex flex-col-reverse sm:flex-row gap-2">
+                  <Button type="submit" className="w-full sm:w-auto">
                     {editing ? 'Actualizar' : 'Crear'}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditing(null); setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' }) }}>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' }) }}>
                     Cancelar
                   </Button>
                 </div>

@@ -31,7 +31,7 @@ export default function Login({ onSwitchToSignup }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-6 sm:py-8">
       <div className="w-full max-w-md">
         {/* Logo y título */}
         <div className="text-center mb-8">
@@ -46,7 +46,7 @@ export default function Login({ onSwitchToSignup }) {
 
         {/* Formulario */}
         <Card className="shadow-lg">
-          <CardContent className="p-6">
+          <CardContent className="p-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -117,11 +117,11 @@ export default function Login({ onSwitchToSignup }) {
 
             {/* Botones sociales */}
             <div className="space-y-3">
-              <Button variant="outline" className="w-full flex items-center justify-center py-3">
+              <Button variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
                 <Chrome className="w-5 h-5 mr-2" />
                 Continue with Google
               </Button>
-              <Button variant="outline" className="w-full flex items-center justify-center py-3">
+              <Button variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
                 <Apple className="w-5 h-5 mr-2" />
                 Continue with Apple
               </Button>
@@ -140,7 +140,7 @@ export default function Login({ onSwitchToSignup }) {
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-xs text-gray-500 space-x-4">
+        <div className="mt-8 text-xs text-gray-500 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
           <a href="#" className="hover:text-gray-700">Privacy Policy</a>
           <a href="#" className="hover:text-gray-700">Terms of Service</a>
           <a href="#" className="hover:text-gray-700">Help</a>

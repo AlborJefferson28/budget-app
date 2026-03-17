@@ -18,7 +18,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
 
   if (accountsLoading || walletsLoading || budgetsLoading || transactionsLoading || allocationsLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando dashboard...</p>
@@ -27,7 +27,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
     )
   }
 
-  if (accountsError) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-600">Error: {accountsError.message}</div>
+  if (accountsError) return <div className="min-h-[60vh] flex items-center justify-center text-red-600">Error: {accountsError.message}</div>
 
   // Calcular total balance
   const totalBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0)
@@ -51,10 +51,10 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
   const recentActivity = transactions.slice(-5).reverse()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="w-full">
       {/* Header */}
-      <div className="bg-white shadow-sm px-4 py-6 lg:px-6">
-        <div className="flex items-center justify-between">
+      <div className="bg-white shadow-sm px-4 py-5 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,7 +68,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
           </div>
           <button
             onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('transactions') } }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+            className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2.5 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Nueva Transacción</span>
@@ -76,7 +76,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
         </div>
       </div>
 
-      <div className="px-4 py-6 lg:px-6 lg:grid lg:grid-cols-3 lg:gap-6">
+      <div className="px-4 py-6 sm:px-6 lg:grid lg:grid-cols-3 lg:gap-6">
         {/* Contenido principal */}
         <div className="lg:col-span-2 space-y-6">
           {/* Tarjetas de resumen */}
@@ -107,11 +107,11 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
 
           {/* Wallets */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Wallets</h2>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('wallets') } }}
-                className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700"
+                className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700 shrink-0"
               >
                 <span>Ver todas</span>
                 <ArrowRight className="w-4 h-4" />
@@ -119,7 +119,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
             </div>
             <div className="space-y-3">
               {wallets.length > 0 ? wallets.slice(0, 3).map(wallet => (
-                <div key={wallet.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={wallet.id} className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <span className="text-2xl">{wallet.icon}</span>
                     <div>
@@ -135,11 +135,11 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
 
           {/* Actividad Reciente */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Actividad Reciente</h2>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('transactions') } }}
-                className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700"
+                className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700 shrink-0"
               >
                 <span>Ver todas</span>
                 <ArrowRight className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
             {/* Mobile: lista */}
             <div className="lg:hidden space-y-3">
               {recentActivity.length > 0 ? recentActivity.map(transaction => (
-                <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={transaction.id} className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <Activity className="w-5 h-5 text-gray-400" />
                     <div>
@@ -198,7 +198,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
         </div>
 
         {/* Columna derecha */}
-        <div className="space-y-6">
+        <div className="space-y-6 mt-6 lg:mt-0">
           {/* Quick Actions */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>

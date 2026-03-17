@@ -7,7 +7,7 @@ export default function UserCard({ user, onLogout }) {
   }
 
   return (
-    <div className="p-4 border-t bg-gray-50">
+    <div className="p-4 border-t bg-gray-50 shrink-0">
       <div className="flex items-center space-x-3">
         <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
           <span className="text-gray-600 font-bold">{getInitials(user?.email)}</span>
@@ -22,6 +22,7 @@ export default function UserCard({ user, onLogout }) {
         </div>
         <button
           onClick={onLogout}
+          aria-label="Cerrar sesión"
           className="p-2 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <LogOut className="w-4 h-4 text-gray-600" />

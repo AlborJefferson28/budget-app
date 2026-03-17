@@ -23,9 +23,9 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
 
   return (
     <>
-      {isMobile && isOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose}></div>}
-      <div className={`h-full w-64 bg-white border-r ${isMobile ? 'fixed left-0 top-0 z-50 transform transition-transform' : 'static'} ${isMobile && isOpen ? 'translate-x-0' : isMobile && !isOpen ? '-translate-x-full' : ''}`}>
-        <div className="p-4 border-b">
+      {isMobile && isOpen && <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px]" onClick={onClose}></div>}
+      <aside className={`h-screen w-[17rem] bg-white border-r flex flex-col ${isMobile ? 'fixed left-0 top-0 z-50 transform transition-transform duration-200 ease-out' : 'sticky top-0'} ${isMobile && isOpen ? 'translate-x-0' : isMobile && !isOpen ? '-translate-x-full' : ''}`}>
+        <div className="p-4 border-b shrink-0">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,14 +35,14 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
             <h2 className="text-lg font-bold">Budget App</h2>
           </div>
         </div>
-        <nav className="p-4 space-y-2">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
           {items.map(item => {
             const Icon = item.icon
             return (
               <button
                 key={item.page}
                 onClick={() => handleItemClick(item.page)}
-                className={`w-full flex items-center space-x-3 p-3 rounded-lg text-left ${currentPage === item.page ? 'bg-blue-100 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                className={`w-full flex items-center space-x-3 p-3 rounded-lg text-left text-sm font-medium ${currentPage === item.page ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}
               >
                 <Icon className="w-5 h-5" />
                 <span>{item.name}</span>
@@ -51,7 +51,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
           })}
         </nav>
         <UserCard user={user} onLogout={signOut} />
-      </div>
+      </aside>
     </>
   )
 }

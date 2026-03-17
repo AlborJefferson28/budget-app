@@ -64,13 +64,15 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       {isMobile && (
-        <header className="w-full bg-white border-b px-4 py-3 flex items-center">
+        <header className="w-full bg-white border-b px-4 py-3 flex items-center justify-between">
           <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
             <Menu className="w-6 h-6 text-gray-700" />
           </button>
+          <span className="text-sm font-semibold text-gray-800">Budget App</span>
+          <span className="w-10" />
         </header>
       )}
-      <div className="flex">
+      <div className="flex min-h-[calc(100vh-57px)] lg:min-h-screen">
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={closeSidebar}
@@ -82,7 +84,7 @@ function App() {
           isMobile={isMobile}
           user={user}
         />
-        <main className="flex-1 p-6">
+        <main className="flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">
           {renderPage()}
         </main>
       </div>

@@ -25,7 +25,7 @@ function IconPicker({ value, onChange }) {
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium mb-2">Ícono</label>
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
         {Object.entries(ICONS).map(([k, v]) => (
           <button
             key={k}
@@ -104,23 +104,23 @@ export default function Budgets({ accountId, setPage }) {
   });
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold mb-1">Savings Goals</h1>
           <p className="text-muted-foreground text-sm">Track and manage your long-term financial objectives.</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow" >
+        <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow w-full sm:w-auto" >
           + Create Budget
         </Button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-8 border-b mb-8">
+      <div className="flex gap-6 overflow-x-auto border-b mb-8 pb-1">
         {TABS.map(tab => (
           <button
             key={tab.key}
-            className={`pb-3 px-1 text-base font-medium border-b-2 transition-colors ${activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-600'}`}
+            className={`pb-3 px-1 text-base font-medium border-b-2 transition-colors shrink-0 ${activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-600'}`}
             onClick={() => setActiveTab(tab.key)}
           >
             {tab.label} {tab.key === 'active' && <span className="ml-1 text-xs bg-blue-100 text-blue-600 rounded px-2">{budgetsWithProgress.length}</span>}
@@ -176,8 +176,8 @@ export default function Budgets({ accountId, setPage }) {
 
       {/* Modal/Formulario */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative">
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h3>
             <div className="mb-4">
               <label className="block text-sm mb-1">Nombre</label>
@@ -204,9 +204,9 @@ export default function Budgets({ accountId, setPage }) {
               value={formData.icon}
               onChange={(icon) => setFormData({ ...formData, icon })}
             />
-            <div className="flex gap-2 justify-end">
-              <Button type="submit">{editing ? 'Actualizar' : 'Crear'}</Button>
-              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'savings' }) }}>Cancelar</Button>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+              <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'savings' }) }}>Cancelar</Button>
             </div>
           </form>
         </div>

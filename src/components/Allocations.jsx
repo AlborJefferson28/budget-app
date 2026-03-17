@@ -98,13 +98,13 @@ export default function Allocations({ accountId, setPage }) {
   if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold mb-1">Allocations</h1>
           <p className="text-muted-foreground text-sm">Distribute funds across your budget categories.</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow">
+        <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow w-full sm:w-auto">
           + New Allocation
         </Button>
       </div>
@@ -116,14 +116,46 @@ export default function Allocations({ accountId, setPage }) {
           placeholder="Search transfers, wallets..."
           value={search}
           onChange={e => { setSearch(e.target.value); setPageNum(1); }}
-          className="max-w-md"
+          className="max-w-md w-full"
         />
       </div>
 
       {/* Tabla de asignaciones */}
       <Card className="mb-8">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="md:hidden p-4 space-y-3">
+            {paged.map((allocation, idx) => (
+              <div key={allocation.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">ORIGIN WALLET</p>
+                    <p className="font-semibold">{allocation.wallets?.icon || '💰'} {allocation.wallets?.name}</p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">DESTINATION BUDGET</p>
+                  <p className="font-semibold">{allocation.budgets?.icon || '🏷️'} {allocation.budgets?.name}</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">AMOUNT</p>
+                    <p className="font-bold text-blue-700">${allocation.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</p>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" variant="outline" onClick={() => handleEdit(allocation)} className="flex-1">Edit</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)} className="flex-1">Delete</Button>
+                </div>
+              </div>
+            ))}
+            {paged.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">No allocations found.</p>
+            )}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b text-muted-foreground">
@@ -169,9 +201,9 @@ export default function Allocations({ accountId, setPage }) {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between px-6 py-3 text-xs text-muted-foreground border-t">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 text-xs text-muted-foreground border-t">
             <span>Showing {paged.length} of {filtered.length} allocations</span>
-            <div className="flex gap-1">
+            <div className="flex gap-1 overflow-x-auto">
               {[...Array(totalPages)].map((_, i) => (
                 <button
                   key={i}
@@ -185,7 +217,7 @@ export default function Allocations({ accountId, setPage }) {
       </Card>
 
       {/* Resúmenes */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
         <Card>
           <CardContent className="py-6">
             <div className="text-xs text-muted-foreground mb-1">Total Allocated</div>
@@ -223,8 +255,8 @@ export default function Allocations({ accountId, setPage }) {
 
       {/* Modal/Formulario */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative">
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Asignación' : 'Nueva Asignación'}</h3>
             <div className="mb-4">
               <label className="block text-sm mb-1">Billetera Origen</label>
@@ -259,9 +291,9 @@ export default function Allocations({ accountId, setPage }) {
                 min={1}
               />
             </div>
-            <div className="flex gap-2 justify-end">
-              <Button type="submit">{editing ? 'Actualizar' : 'Crear'}</Button>
-              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditing(null); setFormData({ wallet_id: '', budget_id: '', amount: 0 }) }}>Cancelar</Button>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+              <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ wallet_id: '', budget_id: '', amount: 0 }) }}>Cancelar</Button>
             </div>
           </form>
         </div>

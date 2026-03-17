@@ -55,13 +55,13 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+      <div className="flex flex-col items-start gap-3 mb-6 sm:flex-row sm:items-center">
         <Button variant="outline" size="sm" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Volver
         </Button>
-        <h1 className="text-3xl font-bold">Detalle de Wallet</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Detalle de Wallet</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -69,8 +69,8 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3 min-w-0">
                   {isEditing ? (
                     <Select value={editForm.icon} onValueChange={(value) => setEditForm({ ...editForm, icon: value })}>
                       <SelectTrigger className="w-20">
@@ -87,7 +87,7 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
                   ) : (
                     <span className="text-4xl">{wallet.icon}</span>
                   )}
-                  <div>
+                  <div className="min-w-0">
                     {isEditing ? (
                       <Input
                         value={editForm.name}
@@ -100,7 +100,7 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
                     <CardDescription>Wallet ID: {wallet.id}</CardDescription>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {isEditing ? (
                     <>
                       <Button variant="outline" size="sm" onClick={handleSave}>
@@ -128,7 +128,7 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div>
                   <p className="text-sm text-gray-500">Balance</p>
                   {isEditing ? (
@@ -156,7 +156,7 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button variant="outline">
                   <Download className="w-4 h-4 mr-2" />
                   Exportar Historial
@@ -176,7 +176,7 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
               ) : walletTransactions.length > 0 ? (
                 <div className="space-y-3">
                   {walletTransactions.map(transaction => (
-                    <div key={transaction.id} className="flex justify-between items-center p-3 border rounded-lg">
+                    <div key={transaction.id} className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center p-3 border rounded-lg">
                       <div>
                         <p className="font-medium">
                           {transaction.type === 'transfer' ? 'Transferencia' : transaction.type}

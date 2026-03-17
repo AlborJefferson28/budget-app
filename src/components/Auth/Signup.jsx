@@ -41,7 +41,7 @@ export default function Signup({ onSwitchToLogin }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-6 sm:py-8">
       <div className="w-full max-w-md">
         {/* Logo y título */}
         <div className="text-center mb-8">
@@ -56,7 +56,7 @@ export default function Signup({ onSwitchToLogin }) {
 
         {/* Formulario */}
         <Card className="shadow-lg">
-          <CardContent className="p-6">
+          <CardContent className="p-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -145,12 +145,12 @@ export default function Signup({ onSwitchToLogin }) {
             </div>
 
             {/* Botones sociales */}
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <Button variant="outline" className="w-full">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Button variant="outline" className="w-full text-sm">
                 <Chrome className="w-5 h-5 mr-2" />
                 Google
               </Button>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full text-sm">
                 <Apple className="w-5 h-5 mr-2" />
                 Apple
               </Button>

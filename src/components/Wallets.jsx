@@ -67,10 +67,10 @@ export default function Wallets({ accountId, setPage }) {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Mis Wallets</h1>
-        <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl sm:text-3xl font-bold">Mis Wallets</h1>
+        <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Nueva Wallet
         </Button>
@@ -87,13 +87,14 @@ export default function Wallets({ accountId, setPage }) {
             className="pl-10"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {['Todas', 'Cripto', 'Fiat', 'Ahorros'].map((f) => (
             <Button
               key={f}
               variant={filter === f ? 'default' : 'outline'}
               size="sm"
               onClick={() => setFilter(f)}
+              className="shrink-0"
             >
               {f}
             </Button>
@@ -119,7 +120,7 @@ export default function Wallets({ accountId, setPage }) {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold text-green-600 mb-4">${wallet.balance}</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEdit(wallet); }}>
                   <Edit className="w-4 h-4 mr-1" />
                   Editar
@@ -141,8 +142,8 @@ export default function Wallets({ accountId, setPage }) {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>{editing ? 'Editar Billetera' : 'Nueva Billetera'}</CardTitle>
             </CardHeader>
@@ -164,7 +165,7 @@ export default function Wallets({ accountId, setPage }) {
                     onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
                     className="mb-2"
                   />
-                  <div className="grid grid-cols-6 gap-2">
+                  <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
                     {iconOptions.map((icon) => (
                       <Button
                         key={icon}
@@ -185,11 +186,11 @@ export default function Wallets({ accountId, setPage }) {
                   value={formData.balance}
                   onChange={(e) => setFormData({ ...formData, balance: parseFloat(e.target.value) })}
                 />
-                <div className="flex gap-2">
-                  <Button type="submit">
+                <div className="flex flex-col-reverse sm:flex-row gap-2">
+                  <Button type="submit" className="w-full sm:w-auto">
                     {editing ? 'Actualizar' : 'Crear'}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', icon: '💰', balance: 0 }) }}>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', icon: '💰', balance: 0 }) }}>
                     Cancelar
                   </Button>
                 </div>
