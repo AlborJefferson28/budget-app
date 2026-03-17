@@ -55,14 +55,14 @@ function App() {
     if (accountScopedPages.includes(currentPage) && !activeAccountId) {
       return (
         <div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
-          <h2 className="text-lg font-semibold text-slate-900">No account selected</h2>
-          <p className="mt-1 text-sm text-slate-500">Select an account to continue.</p>
+          <h2 className="text-lg font-semibold text-slate-900">No hay una cuenta seleccionada</h2>
+          <p className="mt-1 text-sm text-slate-500">Selecciona una cuenta para continuar.</p>
           <button
             type="button"
             onClick={() => setCurrentPage('accounts')}
             className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
           >
-            Go to Accounts
+            Ir a Cuentas
           </button>
         </div>
       )
@@ -117,15 +117,15 @@ function App() {
         />
         <main className="flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">
           <div className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current Account Context</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contexto actual de cuenta</p>
             {activeAccount ? (
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{activeAccount.name}</p>
                   <p className="text-xs text-slate-500">
                     {activeAccount.owner_id === user?.id
-                      ? (activeAccount.kind === 'shared' ? 'Shared account (Owner)' : 'Personal account')
-                      : 'Shared account (Contributor)'}
+                      ? (activeAccount.kind === 'shared' ? 'Cuenta compartida (Propietario)' : 'Cuenta personal')
+                      : 'Cuenta compartida (Colaborador)'}
                   </p>
                 </div>
                 <button
@@ -133,18 +133,18 @@ function App() {
                   onClick={() => setCurrentPage('accounts')}
                   className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 w-full sm:w-auto"
                 >
-                  Change account
+                  Cambiar cuenta
                 </button>
               </div>
             ) : (
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-500">No account selected.</p>
+                <p className="text-sm text-slate-500">No hay una cuenta seleccionada.</p>
                 <button
                   type="button"
                   onClick={() => setCurrentPage('accounts')}
                   className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 w-full sm:w-auto"
                 >
-                  Open accounts
+                  Abrir cuentas
                 </button>
               </div>
             )}

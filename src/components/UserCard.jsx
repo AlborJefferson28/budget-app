@@ -20,14 +20,16 @@ export default function UserCard({ user, onLogout }) {
             {user?.email || 'usuario@ejemplo.com'}
           </p>
         </div>
-        <button
-          onClick={onLogout}
-          aria-label="Cerrar sesión"
-          className="p-2 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <LogOut className="w-4 h-4 text-gray-600" />
-        </button>
       </div>
+
+      <button
+        onClick={onLogout}
+        aria-label="Cerrar sesión"
+        className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <LogOut className="w-4 h-4" />
+        Cerrar sesión
+      </button>
     </div>
   )
 }

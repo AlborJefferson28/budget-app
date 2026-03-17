@@ -514,9 +514,9 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     <div className="mx-auto w-full max-w-6xl px-0 pb-8 sm:px-2">
       <section className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Your Accounts</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Tus cuentas</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Choose an account to manage your finances or create a new one.
+            Elige una cuenta para gestionar tus finanzas o crea una nueva.
           </p>
         </div>
         <Button
@@ -524,7 +524,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
           className="h-11 w-full rounded-2xl bg-[#1f5fe8] px-6 text-sm font-semibold shadow-lg shadow-blue-500/25 hover:bg-[#1852cd] lg:w-auto"
         >
           <CirclePlus className="mr-2 h-5 w-5" />
-          Create New Account
+          Crear cuenta
         </Button>
       </section>
 
@@ -565,7 +565,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       {showMembersModal && membersAccount && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8 w-full max-w-3xl relative max-h-[88vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-1">Manage Members</h3>
+            <h3 className="text-xl font-bold mb-1">Gestionar miembros</h3>
             <p className="text-sm text-gray-600 mb-4">
               Account: <span className="font-semibold text-gray-900">{membersAccount.name}</span>
             </p>
@@ -836,7 +836,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       className="inline-flex items-center gap-2 text-sm font-semibold text-[#1f5fe8] transition-colors hover:text-[#184ac0]"
                     >
                       <UserPlus className="h-5 w-5" />
-                      Manage Members
+                      Gestionar miembros
                     </button>
 
                     {isShared && (
@@ -867,7 +867,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                     }}
                     className="h-10 min-w-[120px] rounded-xl bg-[#1f5fe8] text-sm font-semibold hover:bg-[#1852cd]"
                   >
-                    Open
+                    Abrir
                   </Button>
                 </div>
               </div>
@@ -883,26 +883,26 @@ export default function Accounts({ setPage, setSelectedAccount }) {
           <span className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400">
             <Plus className="h-10 w-10" />
           </span>
-          <h3 className="text-xl font-bold text-slate-900">Add Another Account</h3>
-          <p className="mt-2 text-sm text-slate-500">Easily track multiple funds separately</p>
+          <h3 className="text-xl font-bold text-slate-900">Agregar otra cuenta</h3>
+          <p className="mt-2 text-sm text-slate-500">Gestiona múltiples fondos por separado</p>
         </button>
       </div>
 
       <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Account Contributions History</h2>
-            <p className="text-sm text-slate-500">Track transfers between personal and shared accounts.</p>
+            <h2 className="text-lg font-semibold text-slate-900">Historial de aportes entre cuentas</h2>
+            <p className="text-sm text-slate-500">Consulta transferencias entre cuentas personales y compartidas.</p>
           </div>
 
           <div className="w-full sm:w-72">
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Filter by account</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Filtrar por cuenta</label>
             <select
               value={transferFilterAccount}
               onChange={(e) => setTransferFilterAccount(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <option value="all">All accounts</option>
+              <option value="all">Todas las cuentas</option>
               {accounts.map(account => (
                 <option key={account.id} value={account.id}>{account.name}</option>
               ))}
@@ -917,9 +917,9 @@ export default function Accounts({ setPage, setSelectedAccount }) {
         )}
 
         {transfersLoading ? (
-          <p className="text-sm text-slate-500">Loading contributions...</p>
+          <p className="text-sm text-slate-500">Cargando aportes...</p>
         ) : filteredTransfers.length === 0 ? (
-          <p className="text-sm text-slate-500">No contributions found yet.</p>
+          <p className="text-sm text-slate-500">Aún no hay aportes registrados.</p>
         ) : (
           <div className="space-y-3">
             {filteredTransfers.slice(0, 40).map(transfer => (
@@ -930,10 +930,10 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       {getAccountDisplayName(transfer.from_account_id)} ({getWalletDisplayName(transfer.from_wallet_id)}) {'->'} {getAccountDisplayName(transfer.to_account_id)} ({getWalletDisplayName(transfer.to_wallet_id)})
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      By {getTransferAuthorLabel(transfer.created_by)} - {formatDateTime(transfer.created_at)}
+                      Por {getTransferAuthorLabel(transfer.created_by)} - {formatDateTime(transfer.created_at)}
                     </p>
                     {transfer.note && (
-                      <p className="mt-1 text-xs text-slate-600">Note: {transfer.note}</p>
+                      <p className="mt-1 text-xs text-slate-600">Nota: {transfer.note}</p>
                     )}
                   </div>
                   <span className="text-sm font-bold text-emerald-700">{formatCOP(transfer.amount)}</span>

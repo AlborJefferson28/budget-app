@@ -13,8 +13,8 @@ import { formatCOP, parseCOP } from '../lib/currency';
 import { accountTransfersService, walletsService } from '../services';
 
 const STATUS = {
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700' },
-  processing: { label: 'Processing', color: 'bg-blue-100 text-blue-700' },
+  completed: { label: 'Completada', color: 'bg-green-100 text-green-700' },
+  processing: { label: 'En proceso', color: 'bg-blue-100 text-blue-700' },
 };
 
 function getStatus(idx) {
@@ -214,11 +214,11 @@ export default function Allocations({ accountId, setPage }) {
     <div className="p-4 sm:p-6">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold mb-1">Allocations</h1>
-          <p className="text-muted-foreground text-sm">Distribute funds across your budget categories.</p>
+          <h1 className="text-2xl font-bold mb-1">Asignaciones</h1>
+          <p className="text-muted-foreground text-sm">Distribuye fondos entre tus categorías de presupuesto.</p>
         </div>
         <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow w-full sm:w-auto">
-          + New Allocation
+          + Nueva asignación
         </Button>
       </div>
 
@@ -226,7 +226,7 @@ export default function Allocations({ accountId, setPage }) {
       <div className="mb-4">
         <Input
           type="text"
-          placeholder="Search transfers, wallets..."
+          placeholder="Buscar asignaciones, billeteras..."
           value={search}
           onChange={e => { setSearch(e.target.value); setPageNum(1); }}
           className="max-w-md w-full"
@@ -241,30 +241,30 @@ export default function Allocations({ accountId, setPage }) {
               <div key={allocation.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-xs text-muted-foreground">ORIGIN WALLET</p>
+                    <p className="text-xs text-muted-foreground">BILLETERA ORIGEN</p>
                     <p className="font-semibold">{allocation.wallets?.icon || '💰'} {allocation.wallets?.name}</p>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">DESTINATION BUDGET</p>
+                  <p className="text-xs text-muted-foreground">PRESUPUESTO DESTINO</p>
                   <p className="font-semibold">{allocation.budgets?.icon || '🏷️'} {allocation.budgets?.name}</p>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground">AMOUNT</p>
+                    <p className="text-xs text-muted-foreground">MONTO</p>
                     <p className="font-bold text-blue-700">{formatCOP(allocation.amount)}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</p>
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" variant="outline" onClick={() => handleEdit(allocation)} className="flex-1">Edit</Button>
-                  <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)} className="flex-1">Delete</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleEdit(allocation)} className="flex-1">Editar</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)} className="flex-1">Eliminar</Button>
                 </div>
               </div>
             ))}
             {paged.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">No allocations found.</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">No se encontraron asignaciones.</p>
             )}
           </div>
 
@@ -272,11 +272,11 @@ export default function Allocations({ accountId, setPage }) {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b text-muted-foreground">
-                  <th className="py-3 px-6 text-left font-semibold">ORIGIN WALLET</th>
-                  <th className="py-3 px-6 text-left font-semibold">DESTINATION BUDGET</th>
-                  <th className="py-3 px-6 text-left font-semibold">AMOUNT</th>
-                  <th className="py-3 px-6 text-left font-semibold">DATE</th>
-                  <th className="py-3 px-6 text-left font-semibold">STATUS</th>
+                  <th className="py-3 px-6 text-left font-semibold">BILLETERA ORIGEN</th>
+                  <th className="py-3 px-6 text-left font-semibold">PRESUPUESTO DESTINO</th>
+                  <th className="py-3 px-6 text-left font-semibold">MONTO</th>
+                  <th className="py-3 px-6 text-left font-semibold">FECHA</th>
+                  <th className="py-3 px-6 text-left font-semibold">ESTADO</th>
                   <th className="py-3 px-6"></th>
                 </tr>
               </thead>
@@ -303,19 +303,19 @@ export default function Allocations({ accountId, setPage }) {
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
                     </td>
                     <td className="py-3 px-6 flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(allocation)}>Edit</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)}>Delete</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(allocation)}>Editar</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)}>Eliminar</Button>
                     </td>
                   </tr>
                 ))}
                 {paged.length === 0 && (
-                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No allocations found.</td></tr>
+                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No se encontraron asignaciones.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 text-xs text-muted-foreground border-t">
-            <span>Showing {paged.length} of {filtered.length} allocations</span>
+            <span>Mostrando {paged.length} de {filtered.length} asignaciones</span>
             <div className="flex gap-1 overflow-x-auto">
               {[...Array(totalPages)].map((_, i) => (
                 <button
@@ -333,35 +333,35 @@ export default function Allocations({ accountId, setPage }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
         <Card>
           <CardContent className="py-6">
-            <div className="text-xs text-muted-foreground mb-1">Total Allocated</div>
+            <div className="text-xs text-muted-foreground mb-1">Total asignado</div>
             <div className="text-2xl font-bold text-blue-700">{formatCOP(totalAllocated)}</div>
-            <div className="text-xs text-muted-foreground mt-1">{allocationPercentage.toFixed(1)}% of total wallet balance</div>
+            <div className="text-xs text-muted-foreground mt-1">{allocationPercentage.toFixed(1)}% del balance total de billeteras</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
-            <div className="text-xs text-muted-foreground mb-1">Most Active Wallet</div>
+            <div className="text-xs text-muted-foreground mb-1">Billetera más activa</div>
             <div className="text-xl font-bold">{mostActiveWallet.name}</div>
-            <div className="text-xs text-muted-foreground mt-1">{mostActiveWallet.count} allocations</div>
+            <div className="text-xs text-muted-foreground mt-1">{mostActiveWallet.count} asignaciones</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
-            <div className="text-xs text-muted-foreground mb-1">Budget Coverage</div>
+            <div className="text-xs text-muted-foreground mb-1">Cobertura de presupuestos</div>
             <div className="flex items-center gap-2">
               <span className="text-2xl font-bold">{budgetCoverage}%</span>
             </div>
             <div className="mt-2 w-full h-2 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-blue-600" style={{ width: `${budgetCoverage}%` }} />
             </div>
-            <div className="text-xs text-muted-foreground mt-1">{new Set(allocations.map(a => a.budget_id).filter(id => id)).size} / {budgets.length} budgets</div>
+            <div className="text-xs text-muted-foreground mt-1">{new Set(allocations.map(a => a.budget_id).filter(id => id)).size} / {budgets.length} presupuestos</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
-            <div className="text-xs text-muted-foreground mb-1">Average Allocation</div>
+            <div className="text-xs text-muted-foreground mb-1">Asignación promedio</div>
             <div className="text-2xl font-bold text-green-700">{formatCOP(averageAllocation)}</div>
-            <div className="text-xs text-muted-foreground mt-1">Per allocation</div>
+            <div className="text-xs text-muted-foreground mt-1">Por asignación</div>
           </CardContent>
         </Card>
       </div>

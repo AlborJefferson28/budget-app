@@ -104,10 +104,10 @@ export default function Wallets({ accountId, setPage }) {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl sm:text-3xl font-bold">Mis Wallets</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Mis billeteras</h1>
         <Button onClick={openCreateForm} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
-          Nueva Wallet
+          Nueva billetera
         </Button>
       </div>
 
@@ -123,7 +123,7 @@ export default function Wallets({ accountId, setPage }) {
           />
         </div>
         <div className="text-sm text-slate-500 flex items-center">
-          {filteredWallets.length} wallet{filteredWallets.length === 1 ? '' : 's'}
+          {filteredWallets.length} billetera{filteredWallets.length === 1 ? '' : 's'}
         </div>
       </div>
 
@@ -131,7 +131,7 @@ export default function Wallets({ accountId, setPage }) {
         <Card className="border-dashed border-2 border-gray-300 hover:border-blue-400 transition-colors cursor-pointer" onClick={openCreateForm}>
           <CardContent className="flex flex-col items-center justify-center h-48">
             <Plus className="w-12 h-12 text-gray-400 mb-2" />
-            <p className="text-gray-500">Crear nueva wallet</p>
+            <p className="text-gray-500">Crear nueva billetera</p>
           </CardContent>
         </Card>
 
@@ -247,7 +247,7 @@ export default function Wallets({ accountId, setPage }) {
 
       <div className="mt-6">
         <Button variant="outline" onClick={() => setPage('dashboard')}>
-          Volver al Dashboard
+          Volver al panel
         </Button>
       </div>
     </div>

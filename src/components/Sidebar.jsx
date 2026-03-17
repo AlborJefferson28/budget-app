@@ -3,13 +3,13 @@ import UserCard from './UserCard'
 
 export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSelectedAccount, selectedAccount, signOut, accounts, isMobile, user }) {
   const items = [
-    { name: 'Dashboard', page: 'dashboard', icon: LayoutDashboard },
-    { name: 'Wallets', page: 'wallets', icon: Wallet },
-    { name: 'Transactions', page: 'transactions', icon: ArrowLeftRight },
-    { name: 'Budgets', page: 'budgets', icon: Target },
-    { name: 'Allocations', page: 'allocations', icon: PieChart },
-    { name: 'Accounts', page: 'accounts', icon: Users },
-    { name: 'Profile & Settings', page: 'profile', icon: Settings },
+    { name: 'Panel', page: 'dashboard', icon: LayoutDashboard },
+    { name: 'Billeteras', page: 'wallets', icon: Wallet },
+    { name: 'Transacciones', page: 'transactions', icon: ArrowLeftRight },
+    { name: 'Presupuestos', page: 'budgets', icon: Target },
+    { name: 'Asignaciones', page: 'allocations', icon: PieChart },
+    { name: 'Cuentas', page: 'accounts', icon: Users },
+    { name: 'Perfil y configuración', page: 'profile', icon: Settings },
   ]
 
   const handleItemClick = (page) => {
@@ -25,7 +25,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
   return (
     <>
       {isMobile && isOpen && <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px]" onClick={onClose}></div>}
-      <aside className={`h-screen w-[17rem] bg-white border-r flex flex-col ${isMobile ? 'fixed left-0 top-0 z-50 transform transition-transform duration-200 ease-out' : 'sticky top-0'} ${isMobile && isOpen ? 'translate-x-0' : isMobile && !isOpen ? '-translate-x-full' : ''}`}>
+      <aside className={`h-dvh w-[17rem] bg-white border-r flex flex-col overflow-hidden ${isMobile ? 'fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out' : 'sticky top-0'} ${isMobile && isOpen ? 'translate-x-0' : isMobile && !isOpen ? '-translate-x-full' : ''}`}>
         <div className="p-4 border-b shrink-0">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
@@ -36,7 +36,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
             <h2 className="text-lg font-bold">Budget App</h2>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+        <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2">
           {items.map(item => {
             const Icon = item.icon
             return (

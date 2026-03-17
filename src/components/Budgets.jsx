@@ -17,10 +17,10 @@ const ICONS = {
 };
 
 const TABS = [
-  { key: 'active', label: 'Active Goals' },
-  { key: 'met', label: 'Met Goals' },
-  { key: 'shared', label: 'Shared Budgets' },
-  { key: 'archived', label: 'Archived' },
+  { key: 'active', label: 'Metas activas' },
+  { key: 'met', label: 'Metas logradas' },
+  { key: 'shared', label: 'Presupuestos compartidos' },
+  { key: 'archived', label: 'Archivados' },
 ];
 
 function IconPicker({ value, onChange }) {
@@ -55,10 +55,10 @@ export default function Budgets({ accountId, setPage }) {
 
   // Simulación de estados para demo visual
   const getBudgetStatus = (budget) => {
-    if (budget.progress >= 1) return { label: 'Met Goal', color: 'bg-gray-400', text: 'text-gray-400' };
-    if (budget.progress >= 0.85) return { label: 'Almost There', color: 'bg-green-500', text: 'text-green-600' };
-    if (budget.progress < 0.3) return { label: 'On Track', color: 'bg-orange-400', text: 'text-orange-500' };
-    return { label: 'Active', color: 'bg-blue-600', text: 'text-blue-600' };
+    if (budget.progress >= 1) return { label: 'Meta lograda', color: 'bg-gray-400', text: 'text-gray-400' };
+    if (budget.progress >= 0.85) return { label: 'Casi lista', color: 'bg-green-500', text: 'text-green-600' };
+    if (budget.progress < 0.3) return { label: 'En curso', color: 'bg-orange-400', text: 'text-orange-500' };
+    return { label: 'Activo', color: 'bg-blue-600', text: 'text-blue-600' };
   };
 
   const handleSubmit = async (e) => {
@@ -114,11 +114,11 @@ export default function Budgets({ accountId, setPage }) {
     <div className="p-4 sm:p-6">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold mb-1">Savings Goals</h1>
-          <p className="text-muted-foreground text-sm">Track and manage your long-term financial objectives.</p>
+          <h1 className="text-2xl font-bold mb-1">Metas de ahorro</h1>
+          <p className="text-muted-foreground text-sm">Controla y gestiona tus objetivos financieros de largo plazo.</p>
         </div>
         <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow w-full sm:w-auto" >
-          + Create Budget
+          + Crear presupuesto
         </Button>
       </div>
 
@@ -154,19 +154,19 @@ export default function Budgets({ accountId, setPage }) {
                 <div className="mb-2">
                   <ProgressBar value={Math.round(budget.progress * 100)} color={status.color} />
                   <div className="flex justify-between text-xs mt-1">
-                    <span className="font-semibold">Progress</span>
+                    <span className="font-semibold">Progreso</span>
                     <span className="font-semibold">{Math.round(budget.progress * 100)}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-end mb-2">
                   <div>
-                    <span className="block text-xs text-muted-foreground">CURRENT / GOAL</span>
+                    <span className="block text-xs text-muted-foreground">ACTUAL / META</span>
                     <span className="font-bold text-base">{formatCOP(budget.current)} / {formatCOP(budget.target)}</span>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleEdit(budget)}>Edit</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleEdit(budget)}>Editar</Button>
                     <Button size="sm" variant="outline" onClick={() => handleDelete(budget.id)} className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
-                      Delete
+                      Eliminar
                     </Button>
                   </div>
                 </div>
@@ -178,8 +178,8 @@ export default function Budgets({ accountId, setPage }) {
         <Card className="flex flex-col items-center justify-center border-dashed border-2 min-h-[200px] cursor-pointer hover:bg-gray-50 transition" onClick={() => setShowForm(true)}>
           <div className="flex flex-col items-center">
             <span className="text-3xl mb-2">+</span>
-            <span className="font-semibold">Add New Budget</span>
-            <span className="text-xs text-muted-foreground mt-1">Set a new savings goal and start tracking your progress today.</span>
+            <span className="font-semibold">Agregar nuevo presupuesto</span>
+            <span className="text-xs text-muted-foreground mt-1">Define una nueva meta de ahorro y empieza a seguir su progreso.</span>
           </div>
         </Card>
       </div>

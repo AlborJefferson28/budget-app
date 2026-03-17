@@ -85,7 +85,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
             <div className="bg-white p-6 rounded-xl shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Balance</p>
+                  <p className="text-sm text-gray-600">Balance total</p>
                   <p className="text-2xl font-bold text-gray-900">{formatCOP(totalBalance)}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -96,7 +96,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
             <div className="bg-white p-6 rounded-xl shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Monthly Spending</p>
+                  <p className="text-sm text-gray-600">Gasto mensual</p>
                   <p className="text-2xl font-bold text-gray-900">{formatCOP(monthlySpending)}</p>
                 </div>
                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
@@ -109,7 +109,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
           {/* Wallets */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
             <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Wallets</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Billeteras</h2>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('wallets') } }}
                 className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700 shrink-0"
@@ -130,7 +130,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                   </div>
                   <Wallet className="w-5 h-5 text-gray-400" />
                 </div>
-              )) : <p className="text-gray-500 text-center py-4">No tienes wallets aún. Crea una nueva.</p>}
+              )) : <p className="text-gray-500 text-center py-4">No tienes billeteras aún. Crea una nueva.</p>}
             </div>
           </div>
 
@@ -202,21 +202,21 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
         <div className="space-y-6 mt-6 lg:mt-0">
           {/* Quick Actions */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Acciones rápidas</h3>
             <div className="space-y-3">
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('wallets') } }}
                 className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                <span>Nueva Wallet</span>
+                <span>Nueva billetera</span>
               </button>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('budgets') } }}
                 className="w-full bg-green-600 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-green-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                <span>Nuevo Budget</span>
+                <span>Nuevo presupuesto</span>
               </button>
             </div>
           </div>
@@ -224,7 +224,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
           {/* Budgets */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Budgets</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Presupuestos</h3>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('budgets') } }}
                 className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700"
@@ -250,7 +250,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                     ></div>
                   </div>
                 </div>
-              )) : <p className="text-gray-500 text-center py-4">No tienes budgets aún. Crea uno nuevo.</p>}
+              )) : <p className="text-gray-500 text-center py-4">No tienes presupuestos aún. Crea uno nuevo.</p>}
             </div>
           </div>
 
