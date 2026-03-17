@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
-import { BriefcaseBusiness, CirclePlus, Info, Pencil, PiggyBank, Plus, Trash2, UserPlus, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowRightLeft, BriefcaseBusiness, CirclePlus, Info, Pencil, PiggyBank, Plus, Trash2, UserPlus, Users } from 'lucide-react'
 import { useAccounts } from '../hooks/useAccounts'
 import { useAuth } from '../contexts/AuthContext'
-import { accountMembersService, usersService } from '../services'
+import { accountMembersService, accountTransfersService, usersService, walletsService } from '../services'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
+import { formatCOP, parseCOP } from '../lib/currency'
 
 const CARD_VISUALS = [
   { icon: PiggyBank, container: 'bg-[#dfe8fb] text-[#7c99dc]' },
@@ -24,6 +25,20 @@ const formatDate = (date) => {
     month: 'short',
     day: '2-digit',
     year: 'numeric',
+  }).format(parsedDate)
+}
+
+const formatDateTime = (date) => {
+  if (!date) return 'Unknown'
+  const parsedDate = new Date(date)
+  if (Number.isNaN(parsedDate.getTime())) return 'Unknown'
+
+  return new Intl.DateTimeFormat('es-CO', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(parsedDate)
 }
 
@@ -63,6 +78,26 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   const [membersNotice, setMembersNotice] = useState('')
   const [memberForm, setMemberForm] = useState({ identifier: '', role: 'member' })
 
+  const [showContributionModal, setShowContributionModal] = useState(false)
+  const [contributionAccount, setContributionAccount] = useState(null)
+  const [sourceWallets, setSourceWallets] = useState([])
+  const [targetWallets, setTargetWallets] = useState([])
+  const [contributionLoading, setContributionLoading] = useState(false)
+  const [contributionSubmitting, setContributionSubmitting] = useState(false)
+  const [contributionError, setContributionError] = useState('')
+  const [contributionNotice, setContributionNotice] = useState('')
+  const [contributionForm, setContributionForm] = useState({
+    from_wallet: '',
+    to_wallet: '',
+    amount: '',
+    note: '',
+  })
+  const [transfers, setTransfers] = useState([])
+  const [transfersLoading, setTransfersLoading] = useState(false)
+  const [transfersError, setTransfersError] = useState('')
+  const [transferFilterAccount, setTransferFilterAccount] = useState('all')
+  const [walletNamesById, setWalletNamesById] = useState({})
+
   const currentUserLabel = useMemo(() => {
     const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name
     if (fullName) return fullName
@@ -71,6 +106,70 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   }, [user])
 
   const isOwnerOfMembersAccount = membersAccount?.owner_id === user?.id
+  const isSharedAccount = (account) => account?.kind === 'shared' || account?.owner_id !== user?.id
+  const accountNamesById = useMemo(() => {
+    const map = {}
+    accounts.forEach(account => { map[account.id] = account.name })
+    return map
+  }, [accounts])
+
+  const filteredTransfers = useMemo(() => {
+    if (transferFilterAccount === 'all') return transfers
+    return transfers.filter(transfer =>
+      transfer.from_account_id === transferFilterAccount || transfer.to_account_id === transferFilterAccount
+    )
+  }, [transfers, transferFilterAccount])
+
+  const getAccountDisplayName = (accountId) => accountNamesById[accountId] || shortId(accountId)
+  const getWalletDisplayName = (walletId) => walletNamesById[walletId] || shortId(walletId)
+
+  const loadTransfersHistory = async () => {
+    setTransfersLoading(true)
+    setTransfersError('')
+
+    const { data: transfersData, error: transfersLoadError } = await accountTransfersService.getRecent(120)
+    if (transfersLoadError) {
+      setTransfers([])
+      setTransfersError(getErrorMessage(transfersLoadError, 'Could not load transfers history.'))
+      setTransfersLoading(false)
+      return
+    }
+
+    setTransfers(transfersData || [])
+
+    if (accounts.length === 0) {
+      setWalletNamesById({})
+      setTransfersLoading(false)
+      return
+    }
+
+    const walletResponses = await Promise.all(
+      accounts.map(async (account) => {
+        const response = await walletsService.getByAccount(account.id)
+        return { accountId: account.id, ...response }
+      })
+    )
+
+    const walletLookup = {}
+    walletResponses.forEach(({ data }) => {
+      ;(data || []).forEach(wallet => {
+        walletLookup[wallet.id] = wallet.name
+      })
+    })
+    setWalletNamesById(walletLookup)
+
+    const walletsError = walletResponses.find(item => item.error)?.error
+    if (walletsError && !transfersLoadError) {
+      setTransfersError(getErrorMessage(walletsError, 'Some wallet names could not be loaded.'))
+    }
+
+    setTransfersLoading(false)
+  }
+
+  useEffect(() => {
+    if (loading) return
+    loadTransfersHistory()
+  }, [loading, accounts])
 
   const openCreateForm = () => {
     setEditing(null)
@@ -119,6 +218,91 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     setMembersError('')
     setMembersNotice('')
     setMemberForm({ identifier: '', role: 'member' })
+  }
+
+  const closeContributionModal = () => {
+    setShowContributionModal(false)
+    setContributionAccount(null)
+    setSourceWallets([])
+    setTargetWallets([])
+    setContributionLoading(false)
+    setContributionSubmitting(false)
+    setContributionError('')
+    setContributionNotice('')
+    setContributionForm({
+      from_wallet: '',
+      to_wallet: '',
+      amount: '',
+      note: '',
+    })
+  }
+
+  const openContributionModal = async (targetAccount) => {
+    setContributionAccount(targetAccount)
+    setShowContributionModal(true)
+    setContributionLoading(true)
+    setContributionError('')
+    setContributionNotice('')
+
+    const personalSourceAccounts = accounts.filter(account =>
+      account.owner_id === user?.id &&
+      account.id !== targetAccount.id &&
+      account.kind !== 'shared'
+    )
+
+    if (personalSourceAccounts.length === 0) {
+      setSourceWallets([])
+      setTargetWallets([])
+      setContributionError('Create at least one personal account with funds to contribute.')
+      setContributionLoading(false)
+      return
+    }
+
+    const sourceWalletResponses = await Promise.all(
+      personalSourceAccounts.map(async (account) => {
+        const response = await walletsService.getByAccount(account.id)
+        return { account, ...response }
+      })
+    )
+
+    const sourceError = sourceWalletResponses.find(item => item.error)?.error
+    if (sourceError) {
+      setContributionError(getErrorMessage(sourceError, 'Could not load source wallets.'))
+      setContributionLoading(false)
+      return
+    }
+
+    const sourceWalletOptions = sourceWalletResponses.flatMap(({ account, data }) =>
+      (data || []).map(wallet => ({
+        ...wallet,
+        account_name: account.name,
+      }))
+    )
+
+    const { data: destinationWallets, error: destinationError } = await walletsService.getByAccount(targetAccount.id)
+    if (destinationError) {
+      setContributionError(getErrorMessage(destinationError, 'Could not load destination wallets.'))
+      setContributionLoading(false)
+      return
+    }
+
+    const sharedWalletOptions = destinationWallets || []
+
+    if (sourceWalletOptions.length === 0) {
+      setContributionError('No wallets found in your personal accounts.')
+    } else if (sharedWalletOptions.length === 0) {
+      setContributionError('The shared account has no destination wallets yet.')
+    }
+
+    setSourceWallets(sourceWalletOptions)
+    setTargetWallets(sharedWalletOptions)
+    setContributionForm({
+      from_wallet: sourceWalletOptions[0]?.id || '',
+      to_wallet: sharedWalletOptions[0]?.id || '',
+      amount: '',
+      note: '',
+    })
+    setContributionLoading(false)
   }
 
   const resolveUserId = async (identifier) => {
@@ -213,12 +397,52 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     if (addError) {
       setMembersError(getErrorMessage(addError, 'Could not add member.'))
     } else {
+      if (membersAccount.kind !== 'shared') {
+        await updateAccount(membersAccount.id, { kind: 'shared' })
+        setMembersAccount(prev => prev ? { ...prev, kind: 'shared' } : prev)
+      }
       setMemberForm({ identifier: '', role: 'member' })
       setMembersNotice('Member added successfully.')
       await loadMembers(membersAccount.id)
     }
 
     setMembersBusy(false)
+  }
+
+  const handleContributionSubmit = async (e) => {
+    e.preventDefault()
+    if (!contributionAccount) return
+
+    const parsedAmount = parseCOP(contributionForm.amount)
+    if (!contributionForm.from_wallet || !contributionForm.to_wallet) {
+      setContributionError('Select source and destination wallets.')
+      return
+    }
+    if (!parsedAmount || parsedAmount <= 0) {
+      setContributionError('Enter a valid amount greater than 0.')
+      return
+    }
+
+    setContributionSubmitting(true)
+    setContributionError('')
+    setContributionNotice('')
+
+    const { data, error: transferError } = await accountTransfersService.contributeToSharedAccount({
+      fromWalletId: contributionForm.from_wallet,
+      toWalletId: contributionForm.to_wallet,
+      amount: parsedAmount,
+      note: contributionForm.note.trim(),
+    })
+
+    if (transferError) {
+      setContributionError(getErrorMessage(transferError, 'Could not process contribution.'))
+    } else {
+      setContributionNotice(`Contribution completed. Transfer id: ${shortId(data)}`)
+      setContributionForm(prev => ({ ...prev, amount: '', note: '' }))
+      await loadTransfersHistory()
+    }
+
+    setContributionSubmitting(false)
   }
 
   const handleUpdateMemberRole = async (member, role) => {
@@ -467,12 +691,110 @@ export default function Accounts({ setPage, setSelectedAccount }) {
         </div>
       )}
 
+      {showContributionModal && contributionAccount && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8 w-full max-w-2xl relative max-h-[88vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-1">Contribute To Shared Account</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Destination account: <span className="font-semibold text-gray-900">{contributionAccount.name}</span>
+            </p>
+
+            {contributionError && (
+              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {contributionError}
+              </div>
+            )}
+            {contributionNotice && (
+              <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {contributionNotice}
+              </div>
+            )}
+
+            {contributionLoading ? (
+              <p className="text-sm text-slate-500">Loading contribution options...</p>
+            ) : (
+              <form onSubmit={handleContributionSubmit} className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm text-slate-600">From Personal Wallet</label>
+                  <select
+                    value={contributionForm.from_wallet}
+                    onChange={(e) => setContributionForm(prev => ({ ...prev, from_wallet: e.target.value }))}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    disabled={contributionSubmitting || sourceWallets.length === 0}
+                  >
+                    {sourceWallets.map(wallet => (
+                      <option key={wallet.id} value={wallet.id}>
+                        {wallet.icon || '💰'} {wallet.name} ({wallet.account_name}) - {formatCOP(wallet.balance)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-slate-600">To Shared Wallet</label>
+                  <select
+                    value={contributionForm.to_wallet}
+                    onChange={(e) => setContributionForm(prev => ({ ...prev, to_wallet: e.target.value }))}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    disabled={contributionSubmitting || targetWallets.length === 0}
+                  >
+                    {targetWallets.map(wallet => (
+                      <option key={wallet.id} value={wallet.id}>
+                        {wallet.icon || '💰'} {wallet.name} - {formatCOP(wallet.balance)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-slate-600">Amount</label>
+                  <Input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    placeholder="50.00"
+                    value={contributionForm.amount}
+                    onChange={(e) => setContributionForm(prev => ({ ...prev, amount: e.target.value }))}
+                    disabled={contributionSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-slate-600">Note (optional)</label>
+                  <Input
+                    type="text"
+                    placeholder="Monthly contribution"
+                    value={contributionForm.note}
+                    onChange={(e) => setContributionForm(prev => ({ ...prev, note: e.target.value }))}
+                    disabled={contributionSubmitting}
+                  />
+                </div>
+
+                <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeContributionModal}>
+                    Close
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="w-full sm:w-auto bg-[#1f5fe8] hover:bg-[#1852cd]"
+                    disabled={contributionSubmitting || sourceWallets.length === 0 || targetWallets.length === 0}
+                  >
+                    {contributionSubmitting ? 'Processing...' : 'Contribute'}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {accounts.map((account, index) => {
           const visual = CARD_VISUALS[index % CARD_VISUALS.length]
           const Icon = visual.icon
           const isPrimary = account.owner_id === user?.id
-          const ownerLabel = isPrimary ? currentUserLabel : 'Shared Account'
+          const isShared = isSharedAccount(account)
+          const ownerLabel = isPrimary ? currentUserLabel : 'Account Owner'
 
           return (
             <article
@@ -486,11 +808,16 @@ export default function Accounts({ setPage, setSelectedAccount }) {
               <div className="p-6">
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="break-words text-xl font-bold text-slate-900">{account.name}</h3>
-                  {isPrimary && (
-                    <span className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-bold tracking-[0.14em] text-emerald-700">
-                      PRIMARY
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {isPrimary && (
+                      <span className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-bold tracking-[0.14em] text-emerald-700">
+                        PRIMARY
+                      </span>
+                    )}
+                    <span className={`rounded-lg px-3 py-1 text-xs font-bold tracking-[0.12em] ${isShared ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {isShared ? 'SHARED' : 'PERSONAL'}
                     </span>
-                  )}
+                  </div>
                 </div>
 
                 <p className="mt-2 text-sm text-slate-600">Owner: {ownerLabel}</p>
@@ -506,6 +833,17 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       <UserPlus className="h-5 w-5" />
                       Manage Members
                     </button>
+
+                    {isShared && (
+                      <button
+                        type="button"
+                        onClick={() => openContributionModal(account)}
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 transition-colors hover:text-emerald-800"
+                      >
+                        <ArrowRightLeft className="h-4 w-4" />
+                        Contribute
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -544,6 +882,62 @@ export default function Accounts({ setPage, setSelectedAccount }) {
           <p className="mt-2 text-sm text-slate-500">Easily track multiple funds separately</p>
         </button>
       </div>
+
+      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Account Contributions History</h2>
+            <p className="text-sm text-slate-500">Track transfers between personal and shared accounts.</p>
+          </div>
+
+          <div className="w-full sm:w-72">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Filter by account</label>
+            <select
+              value={transferFilterAccount}
+              onChange={(e) => setTransferFilterAccount(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="all">All accounts</option>
+              {accounts.map(account => (
+                <option key={account.id} value={account.id}>{account.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {transfersError && (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            {transfersError}
+          </div>
+        )}
+
+        {transfersLoading ? (
+          <p className="text-sm text-slate-500">Loading contributions...</p>
+        ) : filteredTransfers.length === 0 ? (
+          <p className="text-sm text-slate-500">No contributions found yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {filteredTransfers.slice(0, 40).map(transfer => (
+              <article key={transfer.id} className="rounded-lg border border-slate-200 p-3 sm:p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {getAccountDisplayName(transfer.from_account_id)} ({getWalletDisplayName(transfer.from_wallet_id)}) {'->'} {getAccountDisplayName(transfer.to_account_id)} ({getWalletDisplayName(transfer.to_wallet_id)})
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      By {transfer.created_by === user?.id ? `${currentUserLabel} (You)` : shortId(transfer.created_by)} - {formatDateTime(transfer.created_at)}
+                    </p>
+                    {transfer.note && (
+                      <p className="mt-1 text-xs text-slate-600">Note: {transfer.note}</p>
+                    )}
+                  </div>
+                  <span className="text-sm font-bold text-emerald-700">{formatCOP(transfer.amount)}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="mt-8 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3 text-slate-600">

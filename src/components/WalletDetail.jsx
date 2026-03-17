@@ -5,6 +5,7 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
 import { ArrowLeft, Edit, Trash2, Download, Shield, QrCode, Check, X } from 'lucide-react'
+import { formatCOP, parseCOP } from '../lib/currency'
 
 const iconOptions = [
   '💰', '🏦', '💳', '📱', '💸', '🤑', '💵', '💎', '🏆', '🎯', '🚀', '🌟',
@@ -135,11 +136,11 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
                     <Input
                       type="number"
                       value={editForm.balance}
-                      onChange={(e) => setEditForm({ ...editForm, balance: parseFloat(e.target.value) })}
+                      onChange={(e) => setEditForm({ ...editForm, balance: parseCOP(e.target.value) })}
                       className="text-3xl font-bold"
                     />
                   ) : (
-                    <p className="text-3xl font-bold text-green-600">${wallet.balance}</p>
+                    <p className="text-3xl font-bold text-green-600">{formatCOP(wallet.balance)}</p>
                   )}
                 </div>
                 <div>
@@ -186,7 +187,7 @@ export default function WalletDetail({ wallet, onBack, onEdit, onDelete, updateW
                         </p>
                       </div>
                       <p className={`font-bold ${transaction.to_wallet === wallet.id ? 'text-green-600' : 'text-red-600'}`}>
-                        {transaction.to_wallet === wallet.id ? '+' : '-'}${transaction.amount}
+                        {transaction.to_wallet === wallet.id ? '+' : '-'}{formatCOP(transaction.amount)}
                       </p>
                     </div>
                   ))}

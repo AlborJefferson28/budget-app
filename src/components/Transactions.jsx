@@ -1,38 +1,173 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTransactions } from '../hooks/useTransactions'
 import { useWallets } from '../hooks/useWallets'
+import { useAccounts } from '../hooks/useAccounts'
+import { useAuth } from '../contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
 import { Search, Plus, Edit, Trash2, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react'
+import { formatCOP, parseCOP } from '../lib/currency'
+import { accountTransfersService, walletsService } from '../services'
 
 export default function Transactions({ accountId, setPage }) {
-  const { transactions, loading, error, createTransaction, updateTransaction, deleteTransaction } = useTransactions(accountId)
-  const { wallets } = useWallets(accountId)
+  const { user } = useAuth()
+  const { accounts } = useAccounts()
+  const { transactions, loading, error, createTransaction, updateTransaction, deleteTransaction, refetch: refetchTransactions } = useTransactions(accountId)
+  const { wallets, refetch: refetchWallets } = useWallets(accountId)
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' })
   const [editing, setEditing] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState('Todas')
+  const [personalSourceWallets, setPersonalSourceWallets] = useState([])
+  const [sourceLoading, setSourceLoading] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const activeAccount = useMemo(
+    () => accounts.find(account => account.id === accountId) || null,
+    [accounts, accountId]
+  )
+  const isSharedContext = activeAccount?.kind === 'shared' || activeAccount?.owner_id !== user?.id
+
+  const originWalletOptions = useMemo(() => {
+    const activeOptions = wallets.map(wallet => ({
+      ...wallet,
+      account_name: activeAccount?.name || 'Current account',
+      source_type: 'active',
+    }))
+
+    const personalOptions = personalSourceWallets.map(wallet => ({
+      ...wallet,
+      source_type: 'personal',
+    }))
+
+    return [...activeOptions, ...personalOptions]
+  }, [wallets, personalSourceWallets, activeAccount?.name])
+
+  const destinationWalletOptions = wallets
+
+  useEffect(() => {
+    if (!showForm) return
+
+    const loadPersonalWallets = async () => {
+      if (!isSharedContext) {
+        setPersonalSourceWallets([])
+        setSourceLoading(false)
+        return
+      }
+
+      const personalAccounts = accounts.filter(account =>
+        account.owner_id === user?.id &&
+        account.id !== accountId &&
+        account.kind !== 'shared'
+      )
+
+      if (personalAccounts.length === 0) {
+        setPersonalSourceWallets([])
+        setSourceLoading(false)
+        return
+      }
+
+      setSourceLoading(true)
+      const responses = await Promise.all(
+        personalAccounts.map(async (account) => {
+          const { data, error: walletError } = await walletsService.getByAccount(account.id)
+          return { account, data, error: walletError }
+        })
+      )
+
+      const firstError = responses.find(item => item.error)?.error
+      if (firstError) {
+        setFormError(firstError.message || 'Could not load personal wallets.')
+        setPersonalSourceWallets([])
+        setSourceLoading(false)
+        return
+      }
+
+      const options = responses.flatMap(({ account, data }) =>
+        (data || []).map(wallet => ({
+          ...wallet,
+          account_name: account.name,
+        }))
+      )
+
+      setPersonalSourceWallets(options)
+      setSourceLoading(false)
+    }
+
+    loadPersonalWallets()
+  }, [showForm, isSharedContext, accounts, user?.id, accountId])
+
+  useEffect(() => {
+    if (!showForm || editing) return
+    setFormData(prev => ({
+      ...prev,
+      from_wallet: prev.from_wallet || originWalletOptions[0]?.id || '',
+      to_wallet: prev.to_wallet || destinationWalletOptions[0]?.id || '',
+    }))
+  }, [showForm, editing, originWalletOptions, destinationWalletOptions])
+
+  const closeForm = () => {
+    setShowForm(false)
+    setEditing(null)
+    setFormError('')
+    setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setFormError('')
+
+    const amount = parseCOP(formData.amount)
+    if (amount <= 0) {
+      setFormError('Ingresa un monto válido mayor a 0.')
+      return
+    }
+
     if (editing) {
-      await updateTransaction(editing.id, formData)
+      await updateTransaction(editing.id, { ...formData, amount })
       setEditing(null)
     } else {
-      await createTransaction(formData)
+      const fromWallet = originWalletOptions.find(wallet => wallet.id === formData.from_wallet)
+      const toWallet = destinationWalletOptions.find(wallet => wallet.id === formData.to_wallet)
+
+      if (!fromWallet || !toWallet) {
+        setFormError('Selecciona wallets válidas de origen y destino.')
+        return
+      }
+
+      const isCrossAccountContribution = fromWallet.account_id !== accountId && toWallet.account_id === accountId
+
+      if (isCrossAccountContribution) {
+        const { error: contributionError } = await accountTransfersService.contributeToSharedAccount({
+          fromWalletId: fromWallet.id,
+          toWalletId: toWallet.id,
+          amount,
+          note: 'Contribution from Transactions',
+        })
+
+        if (contributionError) {
+          setFormError(contributionError.message || 'No fue posible procesar el aporte entre cuentas.')
+          return
+        }
+
+        await Promise.all([refetchTransactions(), refetchWallets()])
+      } else {
+        await createTransaction({ ...formData, amount })
+      }
     }
-    setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' })
-    setShowForm(false)
+
+    closeForm()
   }
 
   const handleEdit = (transaction) => {
+    setFormError('')
     setEditing(transaction)
     setFormData({
-      from_wallet: transaction.from_wallet,
-      to_wallet: transaction.to_wallet,
+      from_wallet: transaction.from_wallet || '',
+      to_wallet: transaction.to_wallet || '',
       amount: transaction.amount,
       type: transaction.type
     })
@@ -45,10 +180,23 @@ export default function Transactions({ accountId, setPage }) {
     }
   }
 
+  const getWalletName = (walletId) => {
+    if (!walletId) return ''
+    return wallets.find(wallet => wallet.id === walletId)?.name || shortWalletId(walletId)
+  }
+
+  const shortWalletId = (walletId) => {
+    if (!walletId) return ''
+    return `${walletId.slice(0, 6)}...${walletId.slice(-4)}`
+  }
+
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         wallets.find(w => w.id === transaction.from_wallet)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         wallets.find(w => w.id === transaction.to_wallet)?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const search = searchTerm.toLowerCase()
+    const fromName = getWalletName(transaction.from_wallet).toLowerCase()
+    const toName = getWalletName(transaction.to_wallet).toLowerCase()
+    const matchesSearch = transaction.type.toLowerCase().includes(search) ||
+      fromName.includes(search) ||
+      toName.includes(search)
     const matchesFilter = filter === 'Todas' || transaction.type === filter.toLowerCase()
     return matchesSearch && matchesFilter
   })
@@ -128,12 +276,12 @@ export default function Transactions({ accountId, setPage }) {
             <CardContent>
               <p className="text-sm text-gray-600 mb-2">
                 {transaction.type === 'transfer' 
-                  ? `De ${wallets.find(w => w.id === transaction.from_wallet)?.name} a ${wallets.find(w => w.id === transaction.to_wallet)?.name}`
-                  : `Wallet: ${wallets.find(w => w.id === (transaction.from_wallet || transaction.to_wallet))?.name}`
+                  ? `De ${getWalletName(transaction.from_wallet)} a ${getWalletName(transaction.to_wallet)}`
+                  : `Wallet: ${getWalletName(transaction.from_wallet || transaction.to_wallet)}`
                 }
               </p>
               <p className={`text-2xl font-bold mb-2 ${getTransactionColor(transaction.type)}`}>
-                ${transaction.amount}
+                {formatCOP(transaction.amount)}
               </p>
               <p className="text-sm text-gray-500 mb-4">
                 {new Date(transaction.created_at).toLocaleDateString()}
@@ -161,14 +309,27 @@ export default function Transactions({ accountId, setPage }) {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {formError && (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {formError}
+                  </div>
+                )}
+
+                {isSharedContext && personalSourceWallets.length > 0 && (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    Puedes usar wallets personales como origen para aportar a esta cuenta compartida.
+                  </div>
+                )}
+
                 <Select value={formData.from_wallet} onValueChange={(value) => setFormData({ ...formData, from_wallet: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar billetera origen" />
                   </SelectTrigger>
                   <SelectContent>
-                    {wallets.map(wallet => (
+                    {originWalletOptions.map(wallet => (
                       <SelectItem key={wallet.id} value={wallet.id}>
                         {wallet.icon} {wallet.name}
+                        {wallet.source_type === 'personal' ? ` (Personal: ${wallet.account_name})` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -178,7 +339,7 @@ export default function Transactions({ accountId, setPage }) {
                     <SelectValue placeholder="Seleccionar billetera destino" />
                   </SelectTrigger>
                   <SelectContent>
-                    {wallets.map(wallet => (
+                    {destinationWalletOptions.map(wallet => (
                       <SelectItem key={wallet.id} value={wallet.id}>
                         {wallet.icon} {wallet.name}
                       </SelectItem>
@@ -189,7 +350,7 @@ export default function Transactions({ accountId, setPage }) {
                   type="number"
                   placeholder="Monto"
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, amount: parseCOP(e.target.value) })}
                   required
                 />
                 <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
@@ -203,10 +364,10 @@ export default function Transactions({ accountId, setPage }) {
                   </SelectContent>
                 </Select>
                 <div className="flex flex-col-reverse sm:flex-row gap-2">
-                  <Button type="submit" className="w-full sm:w-auto">
+                  <Button type="submit" className="w-full sm:w-auto" disabled={sourceLoading}>
                     {editing ? 'Actualizar' : 'Crear'}
                   </Button>
-                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' }) }}>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeForm}>
                     Cancelar
                   </Button>
                 </div>

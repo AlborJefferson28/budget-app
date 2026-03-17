@@ -5,6 +5,7 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Search, Plus, Edit, Trash2 } from 'lucide-react'
 import WalletDetail from './WalletDetail'
+import { formatCOP, parseCOP } from '../lib/currency'
 
 const iconOptions = [
   '💰', '🏦', '💳', '📱', '💸', '🤑', '💵', '💎', '🏆', '🎯', '🚀', '🌟',
@@ -119,7 +120,7 @@ export default function Wallets({ accountId, setPage }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-green-600 mb-4">${wallet.balance}</p>
+              <p className="text-2xl font-bold text-green-600 mb-4">{formatCOP(wallet.balance)}</p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEdit(wallet); }}>
                   <Edit className="w-4 h-4 mr-1" />
@@ -184,7 +185,7 @@ export default function Wallets({ accountId, setPage }) {
                   type="number"
                   placeholder="Balance"
                   value={formData.balance}
-                  onChange={(e) => setFormData({ ...formData, balance: parseFloat(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, balance: parseCOP(e.target.value) })}
                 />
                 <div className="flex flex-col-reverse sm:flex-row gap-2">
                   <Button type="submit" className="w-full sm:w-auto">

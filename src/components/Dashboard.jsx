@@ -4,12 +4,13 @@ import { useBudgets } from '../hooks/useBudgets'
 import { useTransactions } from '../hooks/useTransactions'
 import { useAllocations } from '../hooks/useAllocations'
 import { Wallet, TrendingUp, Plus, ArrowRight, DollarSign, Target, Activity, Lightbulb } from 'lucide-react'
+import { formatCOP } from '../lib/currency'
 
-export default function Dashboard({ setPage, setSelectedAccount }) {
+export default function Dashboard({ setPage, setSelectedAccount, accountId: selectedAccountId }) {
   const { accounts, loading: accountsLoading, error: accountsError } = useAccounts()
 
   // Asumir primera cuenta para mostrar datos
-  const accountId = accounts.length > 0 ? accounts[0].id : null
+  const accountId = selectedAccountId || (accounts.length > 0 ? accounts[0].id : null)
 
   const { wallets, loading: walletsLoading } = useWallets(accountId)
   const { budgets, loading: budgetsLoading } = useBudgets(accountId)
@@ -85,7 +86,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Balance</p>
-                  <p className="text-2xl font-bold text-gray-900">${totalBalance.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCOP(totalBalance)}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                   <DollarSign className="w-6 h-6 text-green-600" />
@@ -96,7 +97,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Monthly Spending</p>
-                  <p className="text-2xl font-bold text-gray-900">${monthlySpending.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCOP(monthlySpending)}</p>
                 </div>
                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
                   <TrendingUp className="w-6 h-6 text-red-600" />
@@ -124,7 +125,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
                     <span className="text-2xl">{wallet.icon}</span>
                     <div>
                       <p className="font-medium text-gray-900">{wallet.name}</p>
-                      <p className="text-sm text-gray-600">${wallet.balance.toFixed(2)}</p>
+                      <p className="text-sm text-gray-600">{formatCOP(wallet.balance)}</p>
                     </div>
                   </div>
                   <Wallet className="w-5 h-5 text-gray-400" />
@@ -159,7 +160,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
                     </div>
                   </div>
                   <p className={`font-medium ${transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
-                    {transaction.type === 'expense' ? '-' : '+'}${transaction.amount.toFixed(2)}
+                    {transaction.type === 'expense' ? '-' : '+'}{formatCOP(transaction.amount)}
                   </p>
                 </div>
               )) : <p className="text-gray-500 text-center py-4">No hay actividad reciente.</p>}
@@ -186,7 +187,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
                         </td>
                         <td className="py-3 text-gray-600">{new Date(transaction.created_at).toLocaleDateString()}</td>
                         <td className={`py-3 text-right font-medium ${transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
-                          {transaction.type === 'expense' ? '-' : '+'}${transaction.amount.toFixed(2)}
+                          {transaction.type === 'expense' ? '-' : '+'}{formatCOP(transaction.amount)}
                         </td>
                       </tr>
                     ))}
@@ -240,7 +241,7 @@ export default function Dashboard({ setPage, setSelectedAccount }) {
                       <span className="text-2xl">{budget.icon}</span>
                       <p className="font-medium text-gray-900">{budget.name}</p>
                     </div>
-                    <p className="text-sm text-gray-600">${budget.spent.toFixed(2)} / ${budget.target.toFixed(2)}</p>
+                    <p className="text-sm text-gray-600">{formatCOP(budget.spent)} / {formatCOP(budget.target)}</p>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div

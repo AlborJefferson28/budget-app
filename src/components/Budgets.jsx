@@ -6,6 +6,8 @@ import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { ProgressBar } from './ui/ProgressBar';
 import { Input } from './ui/Input';
+import { formatCOP, parseCOP } from '../lib/currency';
+import { Trash2 } from 'lucide-react';
 
 const ICONS = {
   plane: "✈️", laptop: "💻", book: "📚", home: "🏠", food: "🍽️",
@@ -82,9 +84,14 @@ export default function Budgets({ accountId, setPage }) {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, closeModal = false) => {
     if (window.confirm('¿Estás seguro de eliminar este presupuesto?')) {
       await deleteBudget(id);
+      if (closeModal) {
+        setShowForm(false);
+        setEditing(null);
+        setFormData({ name: '', target: 0, icon: 'savings' });
+      }
     }
   };
 
@@ -154,10 +161,13 @@ export default function Budgets({ accountId, setPage }) {
                 <div className="flex justify-between items-end mb-2">
                   <div>
                     <span className="block text-xs text-muted-foreground">CURRENT / GOAL</span>
-                    <span className="font-bold text-base">${budget.current.toLocaleString()} / ${budget.target.toLocaleString()}</span>
+                    <span className="font-bold text-base">{formatCOP(budget.current)} / {formatCOP(budget.target)}</span>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => handleEdit(budget)}>Edit</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleDelete(budget.id)} className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -195,7 +205,7 @@ export default function Budgets({ accountId, setPage }) {
                 type="number"
                 placeholder="Objetivo"
                 value={formData.target}
-                onChange={e => setFormData({ ...formData, target: parseFloat(e.target.value) })}
+                onChange={e => setFormData({ ...formData, target: parseCOP(e.target.value) })}
                 required
                 min={1}
               />
@@ -205,6 +215,17 @@ export default function Budgets({ accountId, setPage }) {
               onChange={(icon) => setFormData({ ...formData, icon })}
             />
             <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+              {editing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto mr-auto border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => handleDelete(editing.id, true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Eliminar
+                </Button>
+              )}
               <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'savings' }) }}>Cancelar</Button>
             </div>

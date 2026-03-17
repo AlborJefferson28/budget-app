@@ -1,12 +1,16 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAllocations } from '../hooks/useAllocations';
 import { useWallets } from '../hooks/useWallets';
 import { useBudgets } from '../hooks/useBudgets';
+import { useAccounts } from '../hooks/useAccounts';
+import { useAuth } from '../contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/Select';
+import { formatCOP, parseCOP } from '../lib/currency';
+import { accountTransfersService, walletsService } from '../services';
 
 const STATUS = {
   completed: { label: 'Completed', color: 'bg-green-100 text-green-700' },
@@ -19,15 +23,88 @@ function getStatus(idx) {
 }
 
 export default function Allocations({ accountId, setPage }) {
+  const { user } = useAuth();
+  const { accounts } = useAccounts();
   const { allocations, loading, error, createAllocation, updateAllocation, deleteAllocation } = useAllocations(accountId);
   const { wallets } = useWallets(accountId);
   const { budgets } = useBudgets(accountId);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ wallet_id: '', budget_id: '', amount: 0 });
+  const [formData, setFormData] = useState({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState('');
   const [page, setPageNum] = useState(1);
+  const [personalFundingWallets, setPersonalFundingWallets] = useState([]);
+  const [fundingLoading, setFundingLoading] = useState(false);
+  const [formError, setFormError] = useState('');
   const pageSize = 4;
+
+  const activeAccount = useMemo(
+    () => accounts.find(account => account.id === accountId) || null,
+    [accounts, accountId]
+  );
+  const isSharedContext = activeAccount?.kind === 'shared' || activeAccount?.owner_id !== user?.id;
+
+  useEffect(() => {
+    if (!showForm || editing) return;
+
+    setFormData(prev => ({
+      ...prev,
+      wallet_id: prev.wallet_id || wallets[0]?.id || '',
+      budget_id: prev.budget_id || budgets[0]?.id || '',
+    }));
+  }, [showForm, editing, wallets, budgets]);
+
+  useEffect(() => {
+    if (!showForm) return;
+
+    const loadPersonalFundingWallets = async () => {
+      if (!isSharedContext) {
+        setPersonalFundingWallets([]);
+        setFundingLoading(false);
+        return;
+      }
+
+      const personalAccounts = accounts.filter(account =>
+        account.owner_id === user?.id &&
+        account.id !== accountId &&
+        account.kind !== 'shared'
+      );
+
+      if (personalAccounts.length === 0) {
+        setPersonalFundingWallets([]);
+        setFundingLoading(false);
+        return;
+      }
+
+      setFundingLoading(true);
+      const responses = await Promise.all(
+        personalAccounts.map(async (account) => {
+          const { data, error: walletError } = await walletsService.getByAccount(account.id);
+          return { account, data, error: walletError };
+        })
+      );
+
+      const firstError = responses.find(item => item.error)?.error;
+      if (firstError) {
+        setFormError(firstError.message || 'No se pudieron cargar wallets personales.');
+        setPersonalFundingWallets([]);
+        setFundingLoading(false);
+        return;
+      }
+
+      const options = responses.flatMap(({ account, data }) =>
+        (data || []).map(wallet => ({
+          ...wallet,
+          account_name: account.name,
+        }))
+      );
+
+      setPersonalFundingWallets(options);
+      setFundingLoading(false);
+    };
+
+    loadPersonalFundingWallets();
+  }, [showForm, isSharedContext, accounts, user?.id, accountId]);
 
   // Filtros y paginación
   const filtered = useMemo(() => {
@@ -68,13 +145,48 @@ export default function Allocations({ accountId, setPage }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError('');
+    const amount = parseCOP(formData.amount);
+    if (amount <= 0) {
+      setFormError('Ingresa un monto válido mayor a 0.');
+      return;
+    }
+
     if (editing) {
-      await updateAllocation(editing.id, formData);
+      await updateAllocation(editing.id, {
+        wallet_id: formData.wallet_id,
+        budget_id: formData.budget_id,
+        amount,
+      });
       setEditing(null);
     } else {
-      await createAllocation(formData);
+      if (!formData.wallet_id || !formData.budget_id) {
+        setFormError('Selecciona wallet y presupuesto.');
+        return;
+      }
+
+      if (formData.funding_wallet_id) {
+        const selectedBudget = budgets.find(budget => budget.id === formData.budget_id);
+        const { error: contributionError } = await accountTransfersService.contributeToSharedAccount({
+          fromWalletId: formData.funding_wallet_id,
+          toWalletId: formData.wallet_id,
+          amount,
+          note: `Funding allocation for ${selectedBudget?.name || 'budget'}`,
+        });
+
+        if (contributionError) {
+          setFormError(contributionError.message || 'No fue posible aportar desde la wallet personal.');
+          return;
+        }
+      }
+
+      await createAllocation({
+        wallet_id: formData.wallet_id,
+        budget_id: formData.budget_id,
+        amount,
+      });
     }
-    setFormData({ wallet_id: '', budget_id: '', amount: 0 });
+    setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
     setShowForm(false);
   };
 
@@ -84,6 +196,7 @@ export default function Allocations({ accountId, setPage }) {
       wallet_id: allocation.wallet_id,
       budget_id: allocation.budget_id,
       amount: allocation.amount,
+      funding_wallet_id: '',
     });
     setShowForm(true);
   };
@@ -140,7 +253,7 @@ export default function Allocations({ accountId, setPage }) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">AMOUNT</p>
-                    <p className="font-bold text-blue-700">${allocation.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    <p className="font-bold text-blue-700">{formatCOP(allocation.amount)}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</p>
                 </div>
@@ -184,7 +297,7 @@ export default function Allocations({ accountId, setPage }) {
                         <div className="text-xs text-muted-foreground">{allocation.budgets?.description || ''}</div>
                       </div>
                     </td>
-                    <td className="py-3 px-6 font-bold">${allocation.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="py-3 px-6 font-bold">{formatCOP(allocation.amount)}</td>
                     <td className="py-3 px-6">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</td>
                     <td className="py-3 px-6">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
@@ -221,7 +334,7 @@ export default function Allocations({ accountId, setPage }) {
         <Card>
           <CardContent className="py-6">
             <div className="text-xs text-muted-foreground mb-1">Total Allocated</div>
-            <div className="text-2xl font-bold text-blue-700">${totalAllocated.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            <div className="text-2xl font-bold text-blue-700">{formatCOP(totalAllocated)}</div>
             <div className="text-xs text-muted-foreground mt-1">{allocationPercentage.toFixed(1)}% of total wallet balance</div>
           </CardContent>
         </Card>
@@ -247,7 +360,7 @@ export default function Allocations({ accountId, setPage }) {
         <Card>
           <CardContent className="py-6">
             <div className="text-xs text-muted-foreground mb-1">Average Allocation</div>
-            <div className="text-2xl font-bold text-green-700">${averageAllocation.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            <div className="text-2xl font-bold text-green-700">{formatCOP(averageAllocation)}</div>
             <div className="text-xs text-muted-foreground mt-1">Per allocation</div>
           </CardContent>
         </Card>
@@ -258,6 +371,11 @@ export default function Allocations({ accountId, setPage }) {
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Asignación' : 'Nueva Asignación'}</h3>
+            {formError && (
+              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {formError}
+              </div>
+            )}
             <div className="mb-4">
               <label className="block text-sm mb-1">Billetera Origen</label>
               <Select value={formData.wallet_id} onValueChange={v => setFormData({ ...formData, wallet_id: v })}>
@@ -269,6 +387,27 @@ export default function Allocations({ accountId, setPage }) {
                 </SelectContent>
               </Select>
             </div>
+            {!editing && isSharedContext && personalFundingWallets.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-sm mb-1">Aportar desde wallet personal (opcional)</label>
+                <select
+                  value={formData.funding_wallet_id}
+                  onChange={e => setFormData({ ...formData, funding_wallet_id: e.target.value })}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={fundingLoading}
+                >
+                  <option value="">No usar wallet personal</option>
+                  {personalFundingWallets.map(wallet => (
+                    <option key={wallet.id} value={wallet.id}>
+                      {wallet.icon || '💰'} {wallet.name} ({wallet.account_name}) - {formatCOP(wallet.balance)}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Si seleccionas una wallet personal, primero se hará el aporte entre cuentas y luego la asignación al budget.
+                </p>
+              </div>
+            )}
             <div className="mb-4">
               <label className="block text-sm mb-1">Presupuesto Destino</label>
               <Select value={formData.budget_id} onValueChange={v => setFormData({ ...formData, budget_id: v })}>
@@ -286,14 +425,14 @@ export default function Allocations({ accountId, setPage }) {
                 type="number"
                 placeholder="Monto"
                 value={formData.amount}
-                onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                onChange={e => setFormData({ ...formData, amount: parseCOP(e.target.value) })}
                 required
                 min={1}
               />
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
-              <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ wallet_id: '', budget_id: '', amount: 0 }) }}>Cancelar</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={fundingLoading}>{editing ? 'Actualizar' : 'Crear'}</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' }); }}>Cancelar</Button>
             </div>
           </form>
         </div>

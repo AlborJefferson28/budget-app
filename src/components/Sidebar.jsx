@@ -1,7 +1,7 @@
 import { LayoutDashboard, Wallet, ArrowLeftRight, Target, PieChart, Users } from 'lucide-react'
 import UserCard from './UserCard'
 
-export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSelectedAccount, signOut, accounts, isMobile, user }) {
+export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSelectedAccount, selectedAccount, signOut, accounts, isMobile, user }) {
   const items = [
     { name: 'Dashboard', page: 'dashboard', icon: LayoutDashboard },
     { name: 'Wallets', page: 'wallets', icon: Wallet },
@@ -13,9 +13,9 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
 
   const handleItemClick = (page) => {
     setPage(page)
-    if (page === 'dashboard' || page === 'accounts') {
-      setSelectedAccount(null)
-    } else {
+    const accountScopedPages = ['wallets', 'transactions', 'budgets', 'allocations']
+
+    if (accountScopedPages.includes(page) && !selectedAccount) {
       setSelectedAccount(accounts.length > 0 ? accounts[0].id : null)
     }
     onClose()
