@@ -122,6 +122,11 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
   const getAccountDisplayName = (accountId) => accountNamesById[accountId] || shortId(accountId)
   const getWalletDisplayName = (walletId) => walletNamesById[walletId] || shortId(walletId)
+  const getTransferAuthorLabel = (createdBy) => {
+    if (!createdBy) return 'Usuario eliminado'
+    if (createdBy === user?.id) return `${currentUserLabel} (You)`
+    return shortId(createdBy)
+  }
 
   const loadTransfersHistory = async () => {
     setTransfersLoading(true)
@@ -925,7 +930,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       {getAccountDisplayName(transfer.from_account_id)} ({getWalletDisplayName(transfer.from_wallet_id)}) {'->'} {getAccountDisplayName(transfer.to_account_id)} ({getWalletDisplayName(transfer.to_wallet_id)})
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      By {transfer.created_by === user?.id ? `${currentUserLabel} (You)` : shortId(transfer.created_by)} - {formatDateTime(transfer.created_at)}
+                      By {getTransferAuthorLabel(transfer.created_by)} - {formatDateTime(transfer.created_at)}
                     </p>
                     {transfer.note && (
                       <p className="mt-1 text-xs text-slate-600">Note: {transfer.note}</p>
