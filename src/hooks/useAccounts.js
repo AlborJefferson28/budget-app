@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { accountsService } from '../services'
 import { useAuth } from '../contexts/AuthContext'
 
 const sanitizeAccounts = (items = []) => items.filter(account => account?.id)
 const normalizeSingleRow = (data) => (data?.id ? data : data?.[0] || null)
+const ACCOUNTS_CHANGED_EVENT = 'accounts:changed'
+
+const emitAccountsChanged = () => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(ACCOUNTS_CHANGED_EVENT))
+}
 
 export const useAccounts = () => {
   const [accounts, setAccounts] = useState([])
@@ -11,29 +17,50 @@ export const useAccounts = () => {
   const [error, setError] = useState(null)
   const { user } = useAuth()
 
-  const fetchAccounts = async () => {
-    if (!user) return
+  const fetchAccounts = useCallback(async () => {
+    if (!user?.id) {
+      setAccounts([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    const { data, error } = await accountsService.getAll(user.id)
-    if (error) {
-      setError(error)
+    const { data, error: fetchError } = await accountsService.getAll(user.id)
+    if (fetchError) {
+      setError(fetchError)
     } else {
       setAccounts(sanitizeAccounts(data || []))
+      setError(null)
     }
     setLoading(false)
-  }
+  }, [user?.id])
 
   useEffect(() => {
     fetchAccounts()
-  }, [user])
+  }, [fetchAccounts])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const handleAccountsChanged = () => {
+      fetchAccounts()
+    }
+
+    window.addEventListener(ACCOUNTS_CHANGED_EVENT, handleAccountsChanged)
+    return () => window.removeEventListener(ACCOUNTS_CHANGED_EVENT, handleAccountsChanged)
+  }, [fetchAccounts])
 
   const createAccount = async (account) => {
     const { data, error } = await accountsService.create({ ...account, owner_id: user.id })
     const createdAccount = normalizeSingleRow(data)
-    if (!error && createdAccount?.id) {
-      setAccounts(prev => sanitizeAccounts([...prev, createdAccount]))
-    } else if (!error) {
-      await fetchAccounts()
+    if (!error) {
+      if (createdAccount?.id) {
+        setAccounts(prev => sanitizeAccounts([...prev, createdAccount]))
+      } else {
+        await fetchAccounts()
+      }
+      emitAccountsChanged()
     }
     return { data, error }
   }
@@ -48,14 +75,16 @@ export const useAccounts = () => {
       if (!updatedAccount?.id) {
         await fetchAccounts()
       }
+      emitAccountsChanged()
     }
     return { data, error }
   }
 
   const deleteAccount = async (id) => {
-    const error = await accountsService.delete(id)
+    const { error } = await accountsService.delete(id)
     if (!error) {
       setAccounts(prev => sanitizeAccounts(prev).filter(acc => acc.id !== id))
+      emitAccountsChanged()
     }
     return { error }
   }
