@@ -12,9 +12,28 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { formatCOP, parseCOP } from '../lib/currency';
 import { accountTransfersService, walletsService } from '../services';
 
+const QUICK_AMOUNT_STEPS = [10000, 50000, 100000];
+
+const normalizeCOPAmount = (value) => {
+  const parsed = parseCOP(value);
+  return Math.max(0, Math.round(parsed));
+};
+
 const STATUS = {
   completed: { label: 'Completada', color: 'bg-green-100 text-green-700' },
   processing: { label: 'En proceso', color: 'bg-blue-100 text-blue-700' },
+};
+
+const getAllocationType = (amount, average) => {
+  if (!average || average <= 0) {
+    return { label: 'Media', color: 'bg-slate-100 text-slate-700 border-slate-200' };
+  }
+
+  if (amount >= average) {
+    return { label: 'Mas', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+  }
+
+  return { label: 'Menos', color: 'bg-amber-100 text-amber-700 border-amber-200' };
 };
 
 function getStatus(idx) {
@@ -30,6 +49,7 @@ export default function Allocations({ accountId, setPage }) {
   const { budgets } = useBudgets(accountId);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
+  const [amountInput, setAmountInput] = useState('0');
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState('');
   const [page, setPageNum] = useState(1);
@@ -146,7 +166,7 @@ export default function Allocations({ accountId, setPage }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
-    const amount = parseCOP(formData.amount);
+    const amount = normalizeCOPAmount(amountInput);
     if (amount <= 0) {
       setFormError('Ingresa un monto válido mayor a 0.');
       return;
@@ -187,7 +207,13 @@ export default function Allocations({ accountId, setPage }) {
       });
     }
     setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
+    setAmountInput('0');
     setShowForm(false);
+  };
+
+  const applyAmountQuickDelta = (delta) => {
+    const nextValue = Math.max(0, normalizeCOPAmount(amountInput) + delta);
+    setAmountInput(String(nextValue));
   };
 
   const handleEdit = (allocation) => {
@@ -198,6 +224,7 @@ export default function Allocations({ accountId, setPage }) {
       amount: allocation.amount,
       funding_wallet_id: '',
     });
+    setAmountInput(String(normalizeCOPAmount(allocation.amount)));
     setShowForm(true);
   };
 
@@ -205,6 +232,14 @@ export default function Allocations({ accountId, setPage }) {
     if (window.confirm('¿Estás seguro de eliminar esta asignación?')) {
       await deleteAllocation(id);
     }
+  };
+
+  const openCreateForm = () => {
+    setEditing(null);
+    setFormError('');
+    setAmountInput('0');
+    setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
+    setShowForm(true);
   };
 
   if (loading) return <div className="p-8">Cargando...</div>;
@@ -217,7 +252,7 @@ export default function Allocations({ accountId, setPage }) {
           <h1 className="text-2xl font-bold mb-1">Asignaciones</h1>
           <p className="text-muted-foreground text-sm">Distribuye fondos entre tus categorías de presupuesto.</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow w-full sm:w-auto">
+        <Button onClick={openCreateForm} className="h-10 px-6 text-base font-semibold shadow w-full sm:w-auto">
           + Nueva asignación
         </Button>
       </div>
@@ -242,13 +277,19 @@ export default function Allocations({ accountId, setPage }) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-xs text-muted-foreground">BILLETERA ORIGEN</p>
-                    <p className="font-semibold">{allocation.wallets?.icon || '💰'} {allocation.wallets?.name}</p>
+                    <div className="mt-1 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+                      <span className="text-lg">{allocation.wallets?.icon || '💰'}</span>
+                      <p className="font-semibold text-blue-900">{allocation.wallets?.name || 'Sin nombre'}</p>
+                    </div>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">PRESUPUESTO DESTINO</p>
-                  <p className="font-semibold">{allocation.budgets?.icon || '🏷️'} {allocation.budgets?.name}</p>
+                  <div className="mt-1 inline-flex items-center gap-2 rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1.5">
+                    <span className="text-lg">{allocation.budgets?.icon || '🏷️'}</span>
+                    <p className="font-semibold text-teal-900">{allocation.budgets?.name || 'Sin nombre'}</p>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -258,6 +299,9 @@ export default function Allocations({ accountId, setPage }) {
                   <p className="text-xs text-muted-foreground">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</p>
                 </div>
                 <div className="flex gap-2 pt-1">
+                  <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${getAllocationType(allocation.amount, averageAllocation).color}`}>
+                    {getAllocationType(allocation.amount, averageAllocation).label}
+                  </span>
                   <Button size="sm" variant="outline" onClick={() => handleEdit(allocation)} className="flex-1">Editar</Button>
                   <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)} className="flex-1">Eliminar</Button>
                 </div>
@@ -275,6 +319,7 @@ export default function Allocations({ accountId, setPage }) {
                   <th className="py-3 px-6 text-left font-semibold">BILLETERA ORIGEN</th>
                   <th className="py-3 px-6 text-left font-semibold">PRESUPUESTO DESTINO</th>
                   <th className="py-3 px-6 text-left font-semibold">MONTO</th>
+                  <th className="py-3 px-6 text-left font-semibold">TIPO</th>
                   <th className="py-3 px-6 text-left font-semibold">FECHA</th>
                   <th className="py-3 px-6 text-left font-semibold">ESTADO</th>
                   <th className="py-3 px-6"></th>
@@ -283,21 +328,30 @@ export default function Allocations({ accountId, setPage }) {
               <tbody>
                 {paged.map((allocation, idx) => (
                   <tr key={allocation.id} className="border-b last:border-0 hover:bg-gray-50 transition">
-                    <td className="py-3 px-6 flex items-center gap-3">
-                      <span className="text-2xl">{allocation.wallets?.icon || '💰'}</span>
-                      <div>
-                        <div className="font-semibold">{allocation.wallets?.name}</div>
-                        <div className="text-xs text-muted-foreground">{allocation.wallets?.type || ''}</div>
+                    <td className="py-3 px-6">
+                      <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                        <span className="text-xl">{allocation.wallets?.icon || '💰'}</span>
+                        <div>
+                          <div className="font-semibold text-blue-900">{allocation.wallets?.name || 'Sin nombre'}</div>
+                          <div className="text-xs text-blue-700/80">Cuenta origen</div>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-3 px-6 flex items-center gap-3">
-                      <span className="text-2xl">{allocation.budgets?.icon || '🏷️'}</span>
-                      <div>
-                        <div className="font-semibold">{allocation.budgets?.name}</div>
-                        <div className="text-xs text-muted-foreground">{allocation.budgets?.description || ''}</div>
+                    <td className="py-3 px-6">
+                      <div className="inline-flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
+                        <span className="text-xl">{allocation.budgets?.icon || '🏷️'}</span>
+                        <div>
+                          <div className="font-semibold text-teal-900">{allocation.budgets?.name || 'Sin nombre'}</div>
+                          <div className="text-xs text-teal-700/80">Presupuesto destino</div>
+                        </div>
                       </div>
                     </td>
                     <td className="py-3 px-6 font-bold">{formatCOP(allocation.amount)}</td>
+                    <td className="py-3 px-6">
+                      <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getAllocationType(allocation.amount, averageAllocation).color}`}>
+                        {getAllocationType(allocation.amount, averageAllocation).label}
+                      </span>
+                    </td>
                     <td className="py-3 px-6">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</td>
                     <td className="py-3 px-6">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
@@ -309,7 +363,7 @@ export default function Allocations({ accountId, setPage }) {
                   </tr>
                 ))}
                 {paged.length === 0 && (
-                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No se encontraron asignaciones.</td></tr>
+                  <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No se encontraron asignaciones.</td></tr>
                 )}
               </tbody>
             </table>
@@ -422,17 +476,63 @@ export default function Allocations({ accountId, setPage }) {
             <div className="mb-6">
               <label className="block text-sm mb-1">Monto</label>
               <Input
-                type="number"
+                type="text"
                 placeholder="Monto"
-                value={formData.amount}
-                onChange={e => setFormData({ ...formData, amount: parseCOP(e.target.value) })}
+                value={amountInput}
+                onFocus={() => {
+                  if (amountInput === '0') setAmountInput('');
+                }}
+                onChange={e => {
+                  const nextValue = e.target.value;
+                  if (nextValue === '') {
+                    setAmountInput('');
+                    return;
+                  }
+                  if (/^[\d.,\s]+$/.test(nextValue)) {
+                    setAmountInput(nextValue);
+                  }
+                }}
+                onBlur={() => {
+                  if (!amountInput) {
+                    setAmountInput('0');
+                    return;
+                  }
+                  setAmountInput(String(normalizeCOPAmount(amountInput)));
+                }}
                 required
                 min={1}
               />
+              <div className="mt-2 flex flex-wrap gap-2">
+                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                  <Button
+                    key={`alloc-add-${quickAmount}`}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyAmountQuickDelta(quickAmount)}
+                  >
+                    + {formatCOP(quickAmount)}
+                  </Button>
+                ))}
+                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                  <Button
+                    key={`alloc-sub-${quickAmount}`}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyAmountQuickDelta(-quickAmount)}
+                  >
+                    - {formatCOP(quickAmount)}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(amountInput))}</span>
+              </p>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
               <Button type="submit" className="w-full sm:w-auto" disabled={fundingLoading}>{editing ? 'Actualizar' : 'Crear'}</Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' }); }}>Cancelar</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' }); setAmountInput('0'); }}>Cancelar</Button>
             </div>
           </form>
         </div>

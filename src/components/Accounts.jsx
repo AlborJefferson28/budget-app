@@ -15,6 +15,7 @@ const CARD_VISUALS = [
 
 const MEMBER_ROLES = ['member', 'admin']
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
 
 const formatDate = (date) => {
   if (!date) return 'Unknown'
@@ -46,6 +47,11 @@ const getErrorMessage = (error, fallback) => {
   if (!error) return fallback
   if (error.code === '23505') return 'This user is already a member of the account.'
   return error.message || fallback
+}
+
+const normalizeCOPAmount = (value) => {
+  const parsed = parseCOP(value)
+  return Math.max(0, Math.round(parsed))
 }
 
 const getProfileName = (profileData) => {
@@ -89,7 +95,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   const [contributionForm, setContributionForm] = useState({
     from_wallet: '',
     to_wallet: '',
-    amount: '',
+    amount: '0',
     note: '',
   })
   const [transfers, setTransfers] = useState([])
@@ -237,7 +243,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     setContributionForm({
       from_wallet: '',
       to_wallet: '',
-      amount: '',
+      amount: '0',
       note: '',
     })
   }
@@ -304,7 +310,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     setContributionForm({
       from_wallet: sourceWalletOptions[0]?.id || '',
       to_wallet: sharedWalletOptions[0]?.id || '',
-      amount: '',
+      amount: '0',
       note: '',
     })
     setContributionLoading(false)
@@ -418,7 +424,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     e.preventDefault()
     if (!contributionAccount) return
 
-    const parsedAmount = parseCOP(contributionForm.amount)
+    const parsedAmount = normalizeCOPAmount(contributionForm.amount)
     if (!contributionForm.from_wallet || !contributionForm.to_wallet) {
       setContributionError('Select source and destination wallets.')
       return
@@ -443,11 +449,16 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       setContributionError(getErrorMessage(transferError, 'Could not process contribution.'))
     } else {
       setContributionNotice(`Contribution completed. Transfer id: ${shortId(data)}`)
-      setContributionForm(prev => ({ ...prev, amount: '', note: '' }))
+      setContributionForm(prev => ({ ...prev, amount: '0', note: '' }))
       await loadTransfersHistory()
     }
 
     setContributionSubmitting(false)
+  }
+
+  const applyContributionAmountDelta = (delta) => {
+    const nextValue = Math.max(0, normalizeCOPAmount(contributionForm.amount) + delta)
+    setContributionForm(prev => ({ ...prev, amount: String(nextValue) }))
   }
 
   const handleUpdateMemberRole = async (member, role) => {
@@ -754,14 +765,57 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                 <div>
                   <label className="mb-1 block text-sm text-slate-600">Amount</label>
                   <Input
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    placeholder="50.00"
+                    type="text"
+                    placeholder="0"
                     value={contributionForm.amount}
-                    onChange={(e) => setContributionForm(prev => ({ ...prev, amount: e.target.value }))}
+                    onFocus={() => {
+                      if (contributionForm.amount === '0') {
+                        setContributionForm(prev => ({ ...prev, amount: '' }))
+                      }
+                    }}
+                    onChange={(e) => {
+                      const nextValue = e.target.value
+                      if (nextValue === '') {
+                        setContributionForm(prev => ({ ...prev, amount: '' }))
+                        return
+                      }
+                      if (/^[\d.,\s]+$/.test(nextValue)) {
+                        setContributionForm(prev => ({ ...prev, amount: nextValue }))
+                      }
+                    }}
+                    onBlur={() => {
+                      const normalized = String(normalizeCOPAmount(contributionForm.amount))
+                      setContributionForm(prev => ({ ...prev, amount: normalized }))
+                    }}
                     disabled={contributionSubmitting}
                   />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                      <Button
+                        key={`contrib-add-${quickAmount}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyContributionAmountDelta(quickAmount)}
+                      >
+                        + {formatCOP(quickAmount)}
+                      </Button>
+                    ))}
+                    {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                      <Button
+                        key={`contrib-sub-${quickAmount}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyContributionAmountDelta(-quickAmount)}
+                      >
+                        - {formatCOP(quickAmount)}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(contributionForm.amount))}</span>
+                  </p>
                 </div>
 
                 <div>

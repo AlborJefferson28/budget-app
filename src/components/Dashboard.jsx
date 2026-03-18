@@ -1,8 +1,10 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useAccounts } from '../hooks/useAccounts'
 import { useWallets } from '../hooks/useWallets'
 import { useBudgets } from '../hooks/useBudgets'
 import { useTransactions } from '../hooks/useTransactions'
 import { useAllocations } from '../hooks/useAllocations'
+import { accountTransfersService } from '../services'
 import { Wallet, TrendingUp, Plus, ArrowRight, DollarSign, Target, Activity, Lightbulb } from 'lucide-react'
 import { formatCOP } from '../lib/currency'
 
@@ -16,8 +18,44 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
   const { budgets, loading: budgetsLoading } = useBudgets(accountId)
   const { transactions, loading: transactionsLoading } = useTransactions(accountId)
   const { allocations, loading: allocationsLoading } = useAllocations(accountId)
+  const [recentTransfers, setRecentTransfers] = useState([])
+  const [transfersLoading, setTransfersLoading] = useState(false)
 
-  if (accountsLoading || walletsLoading || budgetsLoading || transactionsLoading || allocationsLoading) {
+  useEffect(() => {
+    const loadRecentTransfers = async () => {
+      if (!accountId) {
+        setRecentTransfers([])
+        return
+      }
+
+      setTransfersLoading(true)
+      const { data, error } = await accountTransfersService.getRecent(200)
+
+      if (error) {
+        setRecentTransfers([])
+        setTransfersLoading(false)
+        return
+      }
+
+      const accountTransfers = (data || []).filter(transfer =>
+        transfer.from_account_id === accountId || transfer.to_account_id === accountId
+      )
+      setRecentTransfers(accountTransfers)
+      setTransfersLoading(false)
+    }
+
+    loadRecentTransfers()
+  }, [accountId])
+
+  const walletNameById = useMemo(() => {
+    const map = {}
+    wallets.forEach(wallet => {
+      map[wallet.id] = wallet.name
+    })
+    return map
+  }, [wallets])
+
+  if (accountsLoading || walletsLoading || budgetsLoading || transactionsLoading || allocationsLoading || transfersLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
@@ -33,12 +71,16 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
   // Calcular total balance
   const totalBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0)
 
-  // Calcular monthly spending (gastos del mes actual)
+  // Calcular monthly spending (gastos del mes actual + asignaciones a presupuesto)
   const currentMonth = new Date().getMonth()
   const currentYear = new Date().getFullYear()
-  const monthlySpending = transactions
+  const monthlyExpenseTransactions = transactions
     .filter(t => t.type === 'expense' && new Date(t.created_at).getMonth() === currentMonth && new Date(t.created_at).getFullYear() === currentYear)
     .reduce((sum, t) => sum + t.amount, 0)
+  const monthlyBudgetAllocations = allocations
+    .filter(a => new Date(a.created_at).getMonth() === currentMonth && new Date(a.created_at).getFullYear() === currentYear)
+    .reduce((sum, a) => sum + a.amount, 0)
+  const monthlySpending = monthlyExpenseTransactions + monthlyBudgetAllocations
 
   // Calcular progreso de budgets (asumiendo allocations como spent)
   const budgetProgress = budgets.map(budget => {
@@ -48,8 +90,62 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
     return { ...budget, spent, progress: budget.target > 0 ? (spent / budget.target) * 100 : 0 }
   })
 
-  // Actividad reciente: últimas 5 transacciones
-  const recentActivity = transactions.slice(-5).reverse()
+  const shortId = (id) => {
+    if (!id) return ''
+    return `${id.slice(0, 6)}...${id.slice(-4)}`
+  }
+
+  const getWalletName = (walletId) => walletNameById[walletId] || shortId(walletId)
+
+  const transactionEvents = transactions.map(transaction => {
+    const typeLabel = transaction.type === 'transfer'
+      ? 'Transferencia'
+      : transaction.type === 'income'
+        ? 'Ingreso'
+        : 'Gasto'
+
+    return {
+      id: `transaction-${transaction.id}`,
+      date: transaction.created_at,
+      type: 'transaction',
+      title: typeLabel,
+      subtitle: transaction.type === 'transfer'
+        ? `De ${getWalletName(transaction.from_wallet)} a ${getWalletName(transaction.to_wallet)}`
+        : `Wallet: ${getWalletName(transaction.from_wallet || transaction.to_wallet)}`,
+      amount: transaction.amount,
+      amountStyle: transaction.type === 'expense' ? 'text-red-600' : 'text-green-600',
+      amountPrefix: transaction.type === 'expense' ? '-' : '+',
+    }
+  })
+
+  const transferEvents = recentTransfers.map(transfer => {
+    const isIncoming = transfer.to_account_id === accountId
+    return {
+      id: `account-transfer-${transfer.id}`,
+      date: transfer.created_at,
+      type: 'account_transfer',
+      title: 'Aporte entre cuentas',
+      subtitle: `${shortId(transfer.from_wallet_id)} -> ${shortId(transfer.to_wallet_id)}`,
+      amount: transfer.amount,
+      amountStyle: isIncoming ? 'text-green-600' : 'text-red-600',
+      amountPrefix: isIncoming ? '+' : '-',
+    }
+  })
+
+  const allocationEvents = allocations.map(allocation => ({
+    id: `allocation-${allocation.id}`,
+    date: allocation.created_at,
+    type: 'allocation',
+    title: 'Asignación a presupuesto',
+    subtitle: `${allocation.wallets?.name || shortId(allocation.wallet_id)} -> ${allocation.budgets?.name || shortId(allocation.budget_id)}`,
+    amount: allocation.amount,
+    amountStyle: 'text-blue-600',
+    amountPrefix: '-',
+  }))
+
+  const recentActivity = [...transactionEvents, ...transferEvents, ...allocationEvents]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 20)
 
   return (
     <div className="w-full">
@@ -98,6 +194,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                 <div>
                   <p className="text-sm text-gray-600">Gasto mensual</p>
                   <p className="text-2xl font-bold text-gray-900">{formatCOP(monthlySpending)}</p>
+                  <p className="text-xs text-gray-500 mt-1">Incluye gastos y asignaciones a presupuestos</p>
                 </div>
                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
                   <TrendingUp className="w-6 h-6 text-red-600" />
@@ -118,8 +215,8 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-3">
-              {wallets.length > 0 ? wallets.slice(0, 3).map(wallet => (
+            <div className="max-h-[300px] overflow-y-auto pr-1 space-y-3">
+              {wallets.length > 0 ? wallets.slice(0, 12).map(wallet => (
                 <div key={wallet.id} className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <span className="text-2xl">{wallet.icon}</span>
@@ -147,26 +244,25 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
               </button>
             </div>
             {/* Mobile: lista */}
-            <div className="lg:hidden space-y-3">
-              {recentActivity.length > 0 ? recentActivity.map(transaction => (
-                <div key={transaction.id} className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg">
+            <div className="lg:hidden max-h-[360px] overflow-y-auto pr-1 space-y-3">
+              {recentActivity.length > 0 ? recentActivity.map(event => (
+                <div key={event.id} className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <Activity className="w-5 h-5 text-gray-400" />
                     <div>
-                      <p className="font-medium text-gray-900">
-                        {transaction.type === 'transfer' ? 'Transferencia' : transaction.type === 'income' ? 'Ingreso' : 'Gasto'}
-                      </p>
-                      <p className="text-sm text-gray-600">{new Date(transaction.created_at).toLocaleDateString()}</p>
+                      <p className="font-medium text-gray-900">{event.title}</p>
+                      <p className="text-sm text-gray-600">{event.subtitle}</p>
+                      <p className="text-xs text-gray-500">{new Date(event.date).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  <p className={`font-medium ${transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
-                    {transaction.type === 'expense' ? '-' : '+'}{formatCOP(transaction.amount)}
+                  <p className={`font-medium ${event.amountStyle}`}>
+                    {event.amountPrefix}{formatCOP(event.amount)}
                   </p>
                 </div>
               )) : <p className="text-gray-500 text-center py-4">No hay actividad reciente.</p>}
             </div>
             {/* Desktop: tabla */}
-            <div className="hidden lg:block">
+            <div className="hidden lg:block max-h-[360px] overflow-y-auto pr-1">
               {recentActivity.length > 0 ? (
                 <table className="w-full text-sm">
                   <thead>
@@ -177,17 +273,18 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                     </tr>
                   </thead>
                   <tbody>
-                    {recentActivity.map(transaction => (
-                      <tr key={transaction.id} className="border-b">
+                    {recentActivity.map(event => (
+                      <tr key={event.id} className="border-b">
                         <td className="py-3">
                           <div className="flex items-center space-x-2">
                             <Activity className="w-4 h-4 text-gray-400" />
-                            <span>{transaction.type === 'transfer' ? 'Transferencia' : transaction.type === 'income' ? 'Ingreso' : 'Gasto'}</span>
+                            <span>{event.title}</span>
                           </div>
+                          <p className="text-xs text-gray-500 mt-1">{event.subtitle}</p>
                         </td>
-                        <td className="py-3 text-gray-600">{new Date(transaction.created_at).toLocaleDateString()}</td>
-                        <td className={`py-3 text-right font-medium ${transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
-                          {transaction.type === 'expense' ? '-' : '+'}{formatCOP(transaction.amount)}
+                        <td className="py-3 text-gray-600">{new Date(event.date).toLocaleDateString()}</td>
+                        <td className={`py-3 text-right font-medium ${event.amountStyle}`}>
+                          {event.amountPrefix}{formatCOP(event.amount)}
                         </td>
                       </tr>
                     ))}

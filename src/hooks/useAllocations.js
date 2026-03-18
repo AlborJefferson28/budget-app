@@ -24,16 +24,16 @@ export const useAllocations = (accountId) => {
 
   const createAllocation = async (allocation) => {
     const { data, error } = await allocationsService.create(allocation)
-    if (!error && data) {
-      setAllocations(prev => [...prev, data[0]])
+    if (!error) {
+      await fetchAllocations()
     }
     return { data, error }
   }
 
   const updateAllocation = async (id, updates) => {
     const { data, error } = await allocationsService.update(id, updates)
-    if (!error && data) {
-      setAllocations(prev => prev.map(a => a.id === id ? data[0] : a))
+    if (!error) {
+      await fetchAllocations()
     }
     return { data, error }
   }

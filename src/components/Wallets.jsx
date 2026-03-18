@@ -11,23 +11,18 @@ const iconOptions = [
   '💰', '🏦', '💳', '📱', '💸', '🤑', '💵', '💎', '🏆', '🎯', '🚀', '🌟',
   '💼', '🛒', '🏠', '🚗', '✈️', '🍔', '🎮', '📚', '🎵', '🏃', '💪', '❤️'
 ]
-
-const COP_NUMBER_FORMATTER = new Intl.NumberFormat('es-CO', {
-  maximumFractionDigits: 0,
-})
+const QUICK_BALANCE_STEPS = [10000, 50000, 100000]
 
 const normalizeCOPAmount = (value) => {
   const parsed = parseCOP(value)
   return Math.max(0, Math.round(parsed))
 }
 
-const formatCOPNumber = (value) => COP_NUMBER_FORMATTER.format(normalizeCOPAmount(value))
-
 export default function Wallets({ accountId, setPage }) {
   const { wallets, loading, error, createWallet, updateWallet, deleteWallet, refetch } = useWallets(accountId)
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ name: '', icon: '💰', balance: 0 })
-  const [balanceInput, setBalanceInput] = useState('')
+  const [balanceInput, setBalanceInput] = useState('0')
   const [editing, setEditing] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedWallet, setSelectedWallet] = useState(null)
@@ -35,20 +30,20 @@ export default function Wallets({ accountId, setPage }) {
   const openCreateForm = () => {
     setEditing(null)
     setFormData({ name: '', icon: '💰', balance: 0 })
-    setBalanceInput('')
+    setBalanceInput('0')
     setShowForm(true)
   }
 
   const resetForm = () => {
     setFormData({ name: '', icon: '💰', balance: 0 })
-    setBalanceInput('')
+    setBalanceInput('0')
     setEditing(null)
     setShowForm(false)
   }
 
-  const applyBalanceQuickAmount = (amount) => {
-    const nextValue = normalizeCOPAmount(balanceInput) + amount
-    setBalanceInput(formatCOPNumber(nextValue))
+  const applyBalanceQuickAmount = (delta) => {
+    const nextValue = Math.max(0, normalizeCOPAmount(balanceInput) + delta)
+    setBalanceInput(String(nextValue))
   }
 
   const handleSubmit = async (e) => {
@@ -71,7 +66,7 @@ export default function Wallets({ accountId, setPage }) {
   const handleEdit = (wallet) => {
     setEditing(wallet)
     setFormData({ name: wallet.name, icon: wallet.icon, balance: wallet.balance })
-    setBalanceInput(formatCOPNumber(wallet.balance))
+    setBalanceInput(String(normalizeCOPAmount(wallet.balance)))
     setShowForm(true)
   }
 
@@ -211,19 +206,48 @@ export default function Wallets({ accountId, setPage }) {
                     type="text"
                     placeholder="0"
                     value={balanceInput}
-                    onChange={(e) => setBalanceInput(e.target.value)}
-                    onBlur={() => setBalanceInput(formatCOPNumber(balanceInput))}
+                    onFocus={() => {
+                      if (balanceInput === '0') setBalanceInput('')
+                    }}
+                    onChange={(e) => {
+                      const nextValue = e.target.value
+                      if (nextValue === '') {
+                        setBalanceInput('')
+                        return
+                      }
+                      if (/^[\d.,\s]+$/.test(nextValue)) {
+                        setBalanceInput(nextValue)
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!balanceInput) {
+                        setBalanceInput('0')
+                        return
+                      }
+                      setBalanceInput(String(normalizeCOPAmount(balanceInput)))
+                    }}
                   />
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {[10000, 50000, 100000].map((quickAmount) => (
+                    {QUICK_BALANCE_STEPS.map((quickAmount) => (
                       <Button
-                        key={quickAmount}
+                        key={`add-${quickAmount}`}
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => applyBalanceQuickAmount(quickAmount)}
                       >
                         + {formatCOP(quickAmount)}
+                      </Button>
+                    ))}
+                    {QUICK_BALANCE_STEPS.map((quickAmount) => (
+                      <Button
+                        key={`sub-${quickAmount}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyBalanceQuickAmount(-quickAmount)}
+                      >
+                        - {formatCOP(quickAmount)}
                       </Button>
                     ))}
                   </div>

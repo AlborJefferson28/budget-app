@@ -11,6 +11,13 @@ import { Search, Plus, Edit, Trash2, ArrowRightLeft, TrendingUp, TrendingDown } 
 import { formatCOP, parseCOP } from '../lib/currency'
 import { accountTransfersService, walletsService } from '../services'
 
+const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
+
+const normalizeCOPAmount = (value) => {
+  const parsed = parseCOP(value)
+  return Math.max(0, Math.round(parsed))
+}
+
 export default function Transactions({ accountId, setPage }) {
   const { user } = useAuth()
   const { accounts } = useAccounts()
@@ -18,12 +25,14 @@ export default function Transactions({ accountId, setPage }) {
   const { wallets, refetch: refetchWallets } = useWallets(accountId)
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' })
+  const [amountInput, setAmountInput] = useState('0')
   const [editing, setEditing] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState('Todas')
   const [personalSourceWallets, setPersonalSourceWallets] = useState([])
   const [sourceLoading, setSourceLoading] = useState(false)
   const [formError, setFormError] = useState('')
+  const [viewingTransaction, setViewingTransaction] = useState(null)
 
   const activeAccount = useMemo(
     () => accounts.find(account => account.id === accountId) || null,
@@ -113,14 +122,28 @@ export default function Transactions({ accountId, setPage }) {
     setShowForm(false)
     setEditing(null)
     setFormError('')
+    setAmountInput('0')
     setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' })
+  }
+
+  const openCreateForm = () => {
+    setEditing(null)
+    setFormError('')
+    setAmountInput('0')
+    setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' })
+    setShowForm(true)
+  }
+
+  const applyAmountQuickDelta = (delta) => {
+    const nextValue = Math.max(0, normalizeCOPAmount(amountInput) + delta)
+    setAmountInput(String(nextValue))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setFormError('')
 
-    const amount = parseCOP(formData.amount)
+    const amount = normalizeCOPAmount(amountInput)
     if (amount <= 0) {
       setFormError('Ingresa un monto válido mayor a 0.')
       return
@@ -163,6 +186,7 @@ export default function Transactions({ accountId, setPage }) {
   }
 
   const handleEdit = (transaction) => {
+    if (transaction.type === 'transfer') return
     setFormError('')
     setEditing(transaction)
     setFormData({
@@ -171,7 +195,16 @@ export default function Transactions({ accountId, setPage }) {
       amount: transaction.amount,
       type: transaction.type
     })
+    setAmountInput(String(normalizeCOPAmount(transaction.amount)))
     setShowForm(true)
+  }
+
+  const handleViewTransaction = (transaction) => {
+    setViewingTransaction(transaction)
+  }
+
+  const closeViewTransaction = () => {
+    setViewingTransaction(null)
   }
 
   const handleDelete = async (id) => {
@@ -225,7 +258,7 @@ export default function Transactions({ accountId, setPage }) {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold">Transacciones</h1>
-        <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+        <Button onClick={openCreateForm} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Nueva Transacción
         </Button>
@@ -258,7 +291,7 @@ export default function Transactions({ accountId, setPage }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="border-dashed border-2 border-gray-300 hover:border-blue-400 transition-colors cursor-pointer" onClick={() => setShowForm(true)}>
+        <Card className="border-dashed border-2 border-gray-300 hover:border-blue-400 transition-colors cursor-pointer" onClick={openCreateForm}>
           <CardContent className="flex flex-col items-center justify-center h-48">
             <Plus className="w-12 h-12 text-gray-400 mb-2" />
             <p className="text-gray-500">Crear nueva transacción</p>
@@ -287,14 +320,22 @@ export default function Transactions({ accountId, setPage }) {
                 {new Date(transaction.created_at).toLocaleDateString()}
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleEdit(transaction)}>
-                  <Edit className="w-4 h-4 mr-1" />
-                  Editar
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleDelete(transaction.id)}>
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  Eliminar
-                </Button>
+                {transaction.type === 'transfer' ? (
+                  <Button variant="outline" size="sm" onClick={() => handleViewTransaction(transaction)}>
+                    Ver movimiento
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => handleEdit(transaction)}>
+                      <Edit className="w-4 h-4 mr-1" />
+                      Editar
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(transaction.id)}>
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Eliminar
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -347,12 +388,58 @@ export default function Transactions({ accountId, setPage }) {
                   </SelectContent>
                 </Select>
                 <Input
-                  type="number"
+                  type="text"
                   placeholder="Monto"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: parseCOP(e.target.value) })}
+                  value={amountInput}
+                  onFocus={() => {
+                    if (amountInput === '0') setAmountInput('')
+                  }}
+                  onChange={(e) => {
+                    const nextValue = e.target.value
+                    if (nextValue === '') {
+                      setAmountInput('')
+                      return
+                    }
+                    if (/^[\d.,\s]+$/.test(nextValue)) {
+                      setAmountInput(nextValue)
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!amountInput) {
+                      setAmountInput('0')
+                      return
+                    }
+                    setAmountInput(String(normalizeCOPAmount(amountInput)))
+                  }}
                   required
                 />
+                <div className="flex flex-wrap gap-2">
+                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                    <Button
+                      key={`tx-add-${quickAmount}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyAmountQuickDelta(quickAmount)}
+                    >
+                      + {formatCOP(quickAmount)}
+                    </Button>
+                  ))}
+                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                    <Button
+                      key={`tx-sub-${quickAmount}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyAmountQuickDelta(-quickAmount)}
+                    >
+                      - {formatCOP(quickAmount)}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">
+                  Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(amountInput))}</span>
+                </p>
                 <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -372,6 +459,39 @@ export default function Transactions({ accountId, setPage }) {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {viewingTransaction && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Detalle de transferencia</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-500">Origen</p>
+                <p className="text-sm font-medium text-gray-900">{getWalletName(viewingTransaction.from_wallet)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Destino</p>
+                <p className="text-sm font-medium text-gray-900">{getWalletName(viewingTransaction.to_wallet)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Monto</p>
+                <p className="text-lg font-bold text-blue-700">{formatCOP(viewingTransaction.amount)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Fecha</p>
+                <p className="text-sm text-gray-900">{new Date(viewingTransaction.created_at).toLocaleString('es-CO')}</p>
+              </div>
+              <div className="pt-2 flex justify-end">
+                <Button type="button" variant="outline" onClick={closeViewTransaction}>
+                  Cerrar
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

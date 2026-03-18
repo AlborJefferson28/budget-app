@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { transactionsService } from '../services'
+import { useAuth } from '../contexts/AuthContext'
 
 export const useTransactions = (accountId) => {
+  const { user } = useAuth()
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -23,7 +25,11 @@ export const useTransactions = (accountId) => {
   }, [accountId])
 
   const createTransaction = async (transaction) => {
-    const { data, error } = await transactionsService.create({ ...transaction, account_id: accountId })
+    const { data, error } = await transactionsService.create({
+      ...transaction,
+      account_id: accountId,
+      created_by: user?.id || null,
+    })
     if (!error && data) {
       setTransactions(prev => [data[0], ...prev])
     }

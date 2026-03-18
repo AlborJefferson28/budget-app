@@ -1,7 +1,9 @@
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useBudgets } from '../hooks/useBudgets';
 import { useAllocations } from '../hooks/useAllocations';
+import { useAccounts } from '../hooks/useAccounts';
+import { useAuth } from '../contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { ProgressBar } from './ui/ProgressBar';
@@ -22,6 +24,13 @@ const TABS = [
   { key: 'shared', label: 'Presupuestos compartidos' },
   { key: 'archived', label: 'Archivados' },
 ];
+
+const QUICK_AMOUNT_STEPS = [10000, 50000, 100000];
+
+const normalizeCOPAmount = (value) => {
+  const parsed = parseCOP(value);
+  return Math.max(0, Math.round(parsed));
+};
 
 function IconPicker({ value, onChange }) {
   return (
@@ -46,12 +55,22 @@ function IconPicker({ value, onChange }) {
 }
 
 export default function Budgets({ accountId, setPage }) {
+  const { user } = useAuth();
+  const { accounts } = useAccounts();
   const { budgets, loading: budgetsLoading, error: budgetsError, createBudget, updateBudget, deleteBudget } = useBudgets(accountId);
   const { allocations, loading: allocationsLoading } = useAllocations(accountId);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ name: '', target: 0, icon: 'savings' });
+  const [targetInput, setTargetInput] = useState('0');
   const [editing, setEditing] = useState(null);
   const [activeTab, setActiveTab] = useState('active');
+
+  const openCreateForm = () => {
+    setEditing(null);
+    setFormData({ name: '', target: 0, icon: 'savings' });
+    setTargetInput('0');
+    setShowForm(true);
+  };
 
   // Simulación de estados para demo visual
   const getBudgetStatus = (budget) => {
@@ -65,6 +84,7 @@ export default function Budgets({ accountId, setPage }) {
     e.preventDefault();
     const dataToSubmit = {
       ...formData,
+      target: normalizeCOPAmount(targetInput),
       icon: ICONS[formData.icon] || '💰'
     };
     if (editing) {
@@ -74,13 +94,20 @@ export default function Budgets({ accountId, setPage }) {
       await createBudget(dataToSubmit);
     }
     setFormData({ name: '', target: 0, icon: 'savings' });
+    setTargetInput('0');
     setShowForm(false);
+  };
+
+  const applyTargetQuickDelta = (delta) => {
+    const nextValue = Math.max(0, normalizeCOPAmount(targetInput) + delta);
+    setTargetInput(String(nextValue));
   };
 
   const handleEdit = (budget) => {
     setEditing(budget);
     const iconKey = Object.keys(ICONS).find(key => ICONS[key] === budget.icon) || 'savings';
     setFormData({ name: budget.name, target: budget.target, icon: iconKey });
+    setTargetInput(String(normalizeCOPAmount(budget.target)));
     setShowForm(true);
   };
 
@@ -91,12 +118,10 @@ export default function Budgets({ accountId, setPage }) {
         setShowForm(false);
         setEditing(null);
         setFormData({ name: '', target: 0, icon: 'savings' });
+        setTargetInput('0');
       }
     }
   };
-
-  if (budgetsLoading || allocationsLoading) return <div className="p-8">Cargando...</div>;
-  if (budgetsError) return <div className="p-8 text-red-500">Error: {budgetsError.message}</div>;
 
   // Calcular valores reales de current y progress basados en allocations
   const budgetsWithProgress = budgets.map((budget) => {
@@ -110,6 +135,35 @@ export default function Budgets({ accountId, setPage }) {
     };
   });
 
+  const activeAccount = useMemo(
+    () => accounts.find(account => account.id === accountId) || null,
+    [accounts, accountId]
+  );
+  const isSharedContext = activeAccount?.kind === 'shared' || activeAccount?.owner_id !== user?.id;
+
+  const budgetsByTab = useMemo(() => {
+    const active = budgetsWithProgress.filter(budget => budget.progress < 1);
+    const met = budgetsWithProgress.filter(budget => budget.progress >= 1);
+    const shared = isSharedContext ? budgetsWithProgress : [];
+    const archived = budgetsWithProgress.filter(
+      budget => budget.archived === true || budget.is_archived === true || budget.status === 'archived'
+    );
+
+    return { active, met, shared, archived };
+  }, [budgetsWithProgress, isSharedContext]);
+
+  const visibleBudgets = budgetsByTab[activeTab] || [];
+  const shouldShowCreateCard = activeTab !== 'met' && activeTab !== 'archived';
+  const emptyByTab = {
+    active: 'No tienes metas activas por ahora.',
+    met: 'Aún no has logrado metas.',
+    shared: isSharedContext ? 'No hay presupuestos compartidos en esta cuenta.' : 'Esta cuenta no es compartida.',
+    archived: 'No hay presupuestos archivados.',
+  };
+
+  if (budgetsLoading || allocationsLoading) return <div className="p-8">Cargando...</div>;
+  if (budgetsError) return <div className="p-8 text-red-500">Error: {budgetsError.message}</div>;
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
@@ -117,7 +171,7 @@ export default function Budgets({ accountId, setPage }) {
           <h1 className="text-2xl font-bold mb-1">Metas de ahorro</h1>
           <p className="text-muted-foreground text-sm">Controla y gestiona tus objetivos financieros de largo plazo.</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="h-10 px-6 text-base font-semibold shadow w-full sm:w-auto" >
+        <Button onClick={openCreateForm} className="h-10 px-6 text-base font-semibold shadow w-full sm:w-auto" >
           + Crear presupuesto
         </Button>
       </div>
@@ -130,14 +184,15 @@ export default function Budgets({ accountId, setPage }) {
             className={`pb-3 px-1 text-base font-medium border-b-2 transition-colors shrink-0 ${activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-600'}`}
             onClick={() => setActiveTab(tab.key)}
           >
-            {tab.label} {tab.key === 'active' && <span className="ml-1 text-xs bg-blue-100 text-blue-600 rounded px-2">{budgetsWithProgress.length}</span>}
+            {tab.label}
+            <span className="ml-1 text-xs bg-blue-100 text-blue-600 rounded px-2">{(budgetsByTab[tab.key] || []).length}</span>
           </button>
         ))}
       </div>
 
       {/* Grid de Budgets */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {budgetsWithProgress.map((budget, idx) => {
+        {visibleBudgets.map((budget, idx) => {
           const status = getBudgetStatus(budget);
           return (
             <Card key={budget.id || idx} className="relative group">
@@ -174,15 +229,20 @@ export default function Budgets({ accountId, setPage }) {
             </Card>
           );
         })}
-        {/* Add New Budget Card */}
-        <Card className="flex flex-col items-center justify-center border-dashed border-2 min-h-[200px] cursor-pointer hover:bg-gray-50 transition" onClick={() => setShowForm(true)}>
-          <div className="flex flex-col items-center">
-            <span className="text-3xl mb-2">+</span>
-            <span className="font-semibold">Agregar nuevo presupuesto</span>
-            <span className="text-xs text-muted-foreground mt-1">Define una nueva meta de ahorro y empieza a seguir su progreso.</span>
-          </div>
-        </Card>
+        {shouldShowCreateCard && (
+          <Card className="flex flex-col items-center justify-center border-dashed border-2 min-h-[200px] cursor-pointer hover:bg-gray-50 transition" onClick={openCreateForm}>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl mb-2">+</span>
+              <span className="font-semibold">Agregar nuevo presupuesto</span>
+              <span className="text-xs text-muted-foreground mt-1">Define una nueva meta de ahorro y empieza a seguir su progreso.</span>
+            </div>
+          </Card>
+        )}
       </div>
+
+      {visibleBudgets.length === 0 && (
+        <p className="mt-4 text-sm text-muted-foreground">{emptyByTab[activeTab]}</p>
+      )}
 
       {/* Modal/Formulario */}
       {showForm && (
@@ -202,13 +262,59 @@ export default function Budgets({ accountId, setPage }) {
             <div className="mb-6">
               <label className="block text-sm mb-1">Objetivo</label>
               <Input
-                type="number"
+                type="text"
                 placeholder="Objetivo"
-                value={formData.target}
-                onChange={e => setFormData({ ...formData, target: parseCOP(e.target.value) })}
+                value={targetInput}
+                onFocus={() => {
+                  if (targetInput === '0') setTargetInput('');
+                }}
+                onChange={e => {
+                  const nextValue = e.target.value;
+                  if (nextValue === '') {
+                    setTargetInput('');
+                    return;
+                  }
+                  if (/^[\d.,\s]+$/.test(nextValue)) {
+                    setTargetInput(nextValue);
+                  }
+                }}
+                onBlur={() => {
+                  if (!targetInput) {
+                    setTargetInput('0');
+                    return;
+                  }
+                  setTargetInput(String(normalizeCOPAmount(targetInput)));
+                }}
                 required
                 min={1}
               />
+              <div className="mt-2 flex flex-wrap gap-2">
+                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                  <Button
+                    key={`budget-add-${quickAmount}`}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyTargetQuickDelta(quickAmount)}
+                  >
+                    + {formatCOP(quickAmount)}
+                  </Button>
+                ))}
+                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                  <Button
+                    key={`budget-sub-${quickAmount}`}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyTargetQuickDelta(-quickAmount)}
+                  >
+                    - {formatCOP(quickAmount)}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(targetInput))}</span>
+              </p>
             </div>
             <IconPicker
               value={formData.icon}
@@ -227,7 +333,7 @@ export default function Budgets({ accountId, setPage }) {
                 </Button>
               )}
               <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'savings' }) }}>Cancelar</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'savings' }); setTargetInput('0'); }}>Cancelar</Button>
             </div>
           </form>
         </div>
