@@ -735,11 +735,15 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     disabled={contributionSubmitting || sourceWallets.length === 0}
                   >
-                    {sourceWallets.map(wallet => (
-                      <option key={wallet.id} value={wallet.id}>
-                        {wallet.name} ({wallet.account_name}) - {formatCOP(wallet.balance)}
-                      </option>
-                    ))}
+                    {sourceWallets.length === 0 ? (
+                      <option value="">No hay billeteras personales disponibles</option>
+                    ) : (
+                      sourceWallets.map(wallet => (
+                        <option key={wallet.id} value={wallet.id}>
+                          {wallet.name} ({wallet.account_name}) - {formatCOP(wallet.balance)}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -751,11 +755,15 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     disabled={contributionSubmitting || targetWallets.length === 0}
                   >
-                    {targetWallets.map(wallet => (
-                      <option key={wallet.id} value={wallet.id}>
-                        {wallet.name} - {formatCOP(wallet.balance)}
-                      </option>
-                    ))}
+                    {targetWallets.length === 0 ? (
+                      <option value="">No hay billeteras compartidas disponibles</option>
+                    ) : (
+                      targetWallets.map(wallet => (
+                        <option key={wallet.id} value={wallet.id}>
+                          {wallet.name} - {formatCOP(wallet.balance)}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -954,6 +962,9 @@ export default function Accounts({ setPage, setSelectedAccount }) {
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="all">Todas las cuentas</option>
+              {accounts.length === 0 && (
+                <option value="" disabled>No hay cuentas para visualizar</option>
+              )}
               {accounts.map(account => (
                 <option key={account.id} value={account.id}>{account.name}</option>
               ))}

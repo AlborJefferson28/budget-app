@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
+import { Select, SelectContent, SelectEmpty, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
 import { Search, Plus, Edit, Trash2, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react'
 import { formatCOP, parseCOP } from '../lib/currency'
 import { accountTransfersService, walletsService } from '../services'
@@ -364,35 +364,53 @@ export default function Transactions({ accountId, setPage }) {
                   </div>
                 )}
 
-                <Select value={formData.from_wallet} onValueChange={(value) => setFormData({ ...formData, from_wallet: value })}>
+                <Select
+                  value={formData.from_wallet}
+                  onValueChange={(value) => setFormData({ ...formData, from_wallet: value })}
+                  disabled={sourceLoading || originWalletOptions.length === 0}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar billetera origen" />
                   </SelectTrigger>
                   <SelectContent>
-                    {originWalletOptions.map(wallet => (
-                      <SelectItem key={wallet.id} value={wallet.id}>
-                        <div className="flex items-center gap-2">
-                          <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
-                          <span>{wallet.name}</span>
-                        </div>
-                        {wallet.source_type === 'personal' ? ` (Personal: ${wallet.account_name})` : ''}
-                      </SelectItem>
-                    ))}
+                    {originWalletOptions.length === 0 ? (
+                      <SelectEmpty>
+                        {sourceLoading ? 'Cargando billeteras...' : 'No hay billeteras disponibles'}
+                      </SelectEmpty>
+                    ) : (
+                      originWalletOptions.map(wallet => (
+                        <SelectItem key={wallet.id} value={wallet.id}>
+                          <div className="flex items-center gap-2">
+                            <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
+                            <span>{wallet.name}</span>
+                          </div>
+                          {wallet.source_type === 'personal' ? ` (Personal: ${wallet.account_name})` : ''}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
-                <Select value={formData.to_wallet} onValueChange={(value) => setFormData({ ...formData, to_wallet: value })}>
+                <Select
+                  value={formData.to_wallet}
+                  onValueChange={(value) => setFormData({ ...formData, to_wallet: value })}
+                  disabled={destinationWalletOptions.length === 0}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar billetera destino" />
                   </SelectTrigger>
                   <SelectContent>
-                    {destinationWalletOptions.map(wallet => (
-                      <SelectItem key={wallet.id} value={wallet.id}>
-                        <div className="flex items-center gap-2">
-                          <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
-                          <span>{wallet.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {destinationWalletOptions.length === 0 ? (
+                      <SelectEmpty>No hay billeteras disponibles</SelectEmpty>
+                    ) : (
+                      destinationWalletOptions.map(wallet => (
+                        <SelectItem key={wallet.id} value={wallet.id}>
+                          <div className="flex items-center gap-2">
+                            <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
+                            <span>{wallet.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 <Input

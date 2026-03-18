@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/Card'
+import { Checkbox } from '../ui/Checkbox'
+import { Card, CardContent } from '../ui/Card'
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Chrome, Apple } from 'lucide-react'
 
 function ErrMsg({ msg }) {
@@ -18,10 +19,29 @@ export default function Login({ onSwitchToSignup }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { signIn } = useAuth()
+  const emailRef = useRef(null)
+  const passwordRef = useRef(null)
+
+  const focusFirstMissingRequiredField = () => {
+    const requiredFields = [
+      { value: email?.trim(), ref: emailRef },
+      { value: password, ref: passwordRef },
+    ]
+    const missingField = requiredFields.find(field => !field.value)
+    if (missingField?.ref?.current) {
+      missingField.ref.current.focus()
+      return true
+    }
+    return false
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    if (focusFirstMissingRequiredField()) {
+      setError('Completa los campos obligatorios.')
+      return
+    }
     setLoading(true)
     const { error } = await signIn(email, password)
     if (error) {
@@ -41,7 +61,7 @@ export default function Login({ onSwitchToSignup }) {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Budget App</h1>
-          <p className="text-muted-foreground">Welcome back! Please sign in to your account.</p>
+          <p className="text-muted-foreground">Bienvenido de nuevo. Inicia sesión para continuar.</p>
         </div>
 
         {/* Formulario */}
@@ -49,14 +69,15 @@ export default function Login({ onSwitchToSignup }) {
           <CardContent className="p-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Correo electrónico</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
+                    ref={emailRef}
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
+                    placeholder="Ingresa tu correo"
                     className="pl-10"
                     required
                   />
@@ -64,16 +85,17 @@ export default function Login({ onSwitchToSignup }) {
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-foreground">Password</label>
-                  <button type="button" className="text-sm text-primary hover:text-primary/80">Forgot password?</button>
+                  <label className="block text-sm font-medium text-foreground">Contraseña</label>
+                  <button type="button" className="text-sm text-primary hover:text-primary/80">¿Olvidaste tu contraseña?</button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
+                    ref={passwordRef}
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder="Ingresa tu contraseña"
                     className="pl-10 pr-10"
                     required
                   />
@@ -86,19 +108,17 @@ export default function Login({ onSwitchToSignup }) {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center">
-                <input
+              <div className="flex items-center gap-2">
+                <Checkbox
                   id="keep-logged-in"
-                  type="checkbox"
                   checked={keepLoggedIn}
-                  onChange={(e) => setKeepLoggedIn(e.target.checked)}
-                  className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-ring"
+                  onCheckedChange={(checked) => setKeepLoggedIn(Boolean(checked))}
                 />
-                <label htmlFor="keep-logged-in" className="ml-2 text-sm text-foreground">Keep me logged in</label>
+                <label htmlFor="keep-logged-in" className="text-sm text-foreground">Mantener sesión iniciada</label>
               </div>
               <ErrMsg msg={error} />
               <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-4 rounded-lg flex items-center justify-center">
-                {loading ? 'Signing in...' : 'Sign in'}
+                {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
                 {!loading && <ArrowRight className="ml-2 w-5 h-5" />}
               </Button>
             </form>
@@ -110,29 +130,32 @@ export default function Login({ onSwitchToSignup }) {
                   <div className="w-full border-t border-border"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-card text-muted-foreground">Or continue with</span>
+                  <span className="px-2 bg-card text-muted-foreground">O continúa con</span>
                 </div>
               </div>
             </div>
 
             {/* Botones sociales */}
             <div className="space-y-3">
-              <Button variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
+              <Button disabled variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
                 <Chrome className="w-5 h-5 mr-2" />
-                Continue with Google
+                Continuar con Google
               </Button>
-              <Button variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
+              <Button disabled variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
                 <Apple className="w-5 h-5 mr-2" />
-                Continue with Apple
+                Continuar con Apple
               </Button>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Inicio con Google y Apple estará disponible pronto.
+            </p>
 
             {/* Enlace para registrarse */}
             <div className="text-center mt-6">
               <p className="text-sm text-muted-foreground">
-                Don't have an account?{' '}
+                ¿No tienes una cuenta?{' '}
                 <button onClick={onSwitchToSignup} className="text-primary hover:text-primary/80 font-medium">
-                  Sign up
+                  Regístrate
                 </button>
               </p>
             </div>
@@ -141,9 +164,9 @@ export default function Login({ onSwitchToSignup }) {
 
         {/* Footer */}
         <div className="mt-8 text-xs text-muted-foreground flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-          <a href="#" className="hover:text-foreground">Privacy Policy</a>
-          <a href="#" className="hover:text-foreground">Terms of Service</a>
-          <a href="#" className="hover:text-foreground">Help</a>
+          <a href="#" className="hover:text-foreground">Política de privacidad</a>
+          <a href="#" className="hover:text-foreground">Términos del servicio</a>
+          <a href="#" className="hover:text-foreground">Ayuda</a>
         </div>
       </div>
     </div>

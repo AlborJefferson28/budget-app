@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -16,20 +16,37 @@ export default function Signup({ onSwitchToLogin }) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [acceptTerms, setAcceptTerms] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { signUp } = useAuth()
+  const emailRef = useRef(null)
+  const passwordRef = useRef(null)
+  const confirmPasswordRef = useRef(null)
+
+  const focusFirstMissingRequiredField = () => {
+    const requiredFields = [
+      { value: email?.trim(), ref: emailRef },
+      { value: password, ref: passwordRef },
+      { value: confirmPassword, ref: confirmPasswordRef },
+    ]
+    const missingField = requiredFields.find(field => !field.value)
+    if (missingField?.ref?.current) {
+      missingField.ref.current.focus()
+      return true
+    }
+    return false
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden')
+    if (focusFirstMissingRequiredField()) {
+      setError('Completa los campos obligatorios.')
       return
     }
-    if (!acceptTerms) {
-      setError('Debes aceptar los términos y condiciones')
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      confirmPasswordRef.current?.focus()
       return
     }
     setLoading(true)
@@ -51,7 +68,7 @@ export default function Signup({ onSwitchToLogin }) {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Budget App</h1>
-          <p className="text-muted-foreground">Create your account to get started.</p>
+          <p className="text-muted-foreground">Crea tu cuenta para empezar.</p>
         </div>
 
         {/* Formulario */}
@@ -59,28 +76,30 @@ export default function Signup({ onSwitchToLogin }) {
           <CardContent className="p-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Correo electrónico</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
+                    ref={emailRef}
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
+                    placeholder="Ingresa tu correo"
                     className="pl-10"
                     required
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Password</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Contraseña</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
+                    ref={passwordRef}
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder="Ingresa tu contraseña"
                     className="pl-10 pr-10"
                     required
                   />
@@ -94,14 +113,15 @@ export default function Signup({ onSwitchToLogin }) {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Confirm Password</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Confirmar contraseña</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
+                    ref={confirmPasswordRef}
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm your password"
+                    placeholder="Confirma tu contraseña"
                     className="pl-10 pr-10"
                     required
                   />
@@ -114,21 +134,9 @@ export default function Signup({ onSwitchToLogin }) {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center">
-                <input
-                  id="acceptTerms"
-                  type="checkbox"
-                  checked={acceptTerms}
-                  onChange={(e) => setAcceptTerms(e.target.checked)}
-                  className="h-4 w-4 text-primary focus:ring-ring border-border rounded bg-background"
-                />
-                <label htmlFor="acceptTerms" className="ml-2 block text-sm text-foreground">
-                  I agree to the <a href="#" className="text-primary hover:text-primary/80">Terms and Conditions</a>
-                </label>
-              </div>
               <ErrMsg msg={error} />
               <Button type="submit" disabled={loading} className="w-full">
-                {loading ? 'Creating account...' : 'Create Account'}
+                {loading ? 'Creando cuenta...' : 'Crear cuenta'}
               </Button>
             </form>
 
@@ -139,31 +147,34 @@ export default function Signup({ onSwitchToLogin }) {
                   <div className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-card text-muted-foreground">Or continue with</span>
+                  <span className="px-2 bg-card text-muted-foreground">O continúa con</span>
                 </div>
               </div>
             </div>
 
             {/* Botones sociales */}
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button variant="outline" className="w-full text-sm">
+              <Button disabled variant="outline" className="w-full text-sm">
                 <Chrome className="w-5 h-5 mr-2" />
                 Google
               </Button>
-              <Button variant="outline" className="w-full text-sm">
+              <Button disabled variant="outline" className="w-full text-sm">
                 <Apple className="w-5 h-5 mr-2" />
                 Apple
               </Button>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Registro con Google y Apple estará disponible pronto.
+            </p>
           </CardContent>
         </Card>
 
         {/* Enlace a login */}
         <div className="text-center mt-6">
           <p className="text-sm text-muted-foreground">
-            Already have an account?{' '}
+            ¿Ya tienes una cuenta?{' '}
             <button onClick={onSwitchToLogin} className="font-medium text-primary hover:text-primary/80">
-              Sign in
+              Inicia sesión
             </button>
           </p>
         </div>

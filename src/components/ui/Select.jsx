@@ -123,6 +123,14 @@ const SelectSeparator = React.forwardRef(({ className, ...props }, ref) => (
 ))
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
 
+function SelectEmpty({ className, children = "No hay datos para mostrar" }) {
+  return (
+    <div className={cn("px-2 py-2 text-sm text-muted-foreground", className)}>
+      {children}
+    </div>
+  )
+}
+
 export {
   Select,
   SelectGroup,
@@ -134,4 +142,5 @@ export {
   SelectSeparator,
   SelectScrollUpButton,
   SelectScrollDownButton,
+  SelectEmpty,
 }
