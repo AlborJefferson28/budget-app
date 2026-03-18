@@ -6,11 +6,12 @@ import { accountMembersService, accountTransfersService, usersService, walletsSe
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { formatCOP, parseCOP } from '../lib/currency'
+import { AccountsSkeleton } from './RouteSkeletons'
 
 const CARD_VISUALS = [
-  { icon: PiggyBank, container: 'bg-[#dfe8fb] text-[#7c99dc]' },
-  { icon: Users, container: 'bg-[#e4e8f7] text-[#8aa1e7]' },
-  { icon: BriefcaseBusiness, container: 'bg-[#e8edf3] text-[#8ea2bb]' },
+  { icon: PiggyBank, container: 'bg-primary/10 text-primary' },
+  { icon: Users, container: 'bg-muted text-foreground' },
+  { icon: BriefcaseBusiness, container: 'bg-accent text-foreground' },
 ]
 
 const MEMBER_ROLES = ['member', 'admin']
@@ -18,9 +19,9 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
 
 const formatDate = (date) => {
-  if (!date) return 'Unknown'
+  if (!date) return 'Sin fecha'
   const parsedDate = new Date(date)
-  if (Number.isNaN(parsedDate.getTime())) return 'Unknown'
+  if (Number.isNaN(parsedDate.getTime())) return 'Sin fecha'
 
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -30,9 +31,9 @@ const formatDate = (date) => {
 }
 
 const formatDateTime = (date) => {
-  if (!date) return 'Unknown'
+  if (!date) return 'Sin fecha'
   const parsedDate = new Date(date)
-  if (Number.isNaN(parsedDate.getTime())) return 'Unknown'
+  if (Number.isNaN(parsedDate.getTime())) return 'Sin fecha'
 
   return new Intl.DateTimeFormat('es-CO', {
     month: 'short',
@@ -108,7 +109,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name
     if (fullName) return fullName
     if (user?.email) return user.email.split('@')[0]
-    return 'You'
+    return 'Tú'
   }, [user])
 
   const isOwnerOfMembersAccount = membersAccount?.owner_id === user?.id
@@ -130,7 +131,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   const getWalletDisplayName = (walletId) => walletNamesById[walletId] || shortId(walletId)
   const getTransferAuthorLabel = (createdBy) => {
     if (!createdBy) return 'Usuario eliminado'
-    if (createdBy === user?.id) return `${currentUserLabel} (You)`
+    if (createdBy === user?.id) return `${currentUserLabel} (Tú)`
     return shortId(createdBy)
   }
 
@@ -506,17 +507,13 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <p className="text-base text-gray-500">Loading accounts...</p>
-      </div>
-    )
+    return <AccountsSkeleton />
   }
 
   if (error) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <p className="text-base text-red-600">Error: {error.message}</p>
+        <p className="text-base text-destructive">Error: {error.message}</p>
       </div>
     )
   }
@@ -525,14 +522,14 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     <div className="mx-auto w-full max-w-6xl px-0 pb-8 sm:px-2">
       <section className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Tus cuentas</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Tus cuentas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Elige una cuenta para gestionar tus finanzas o crea una nueva.
           </p>
         </div>
         <Button
           onClick={openCreateForm}
-          className="h-11 w-full rounded-2xl bg-[#1f5fe8] px-6 text-sm font-semibold shadow-lg shadow-blue-500/25 hover:bg-[#1852cd] lg:w-auto"
+          className="h-11 w-full rounded-2xl bg-primary text-primary-foreground px-6 text-sm font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 lg:w-auto"
         >
           <CirclePlus className="mr-2 h-5 w-5" />
           Crear cuenta
@@ -541,7 +538,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="bg-card rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Cuenta' : 'Nueva Cuenta'}</h3>
             <div className="mb-5">
               <label className="block text-sm mb-1">Nombre</label>
@@ -560,7 +557,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                   type="button"
                   variant="outline"
                   onClick={() => handleDelete(editing.id)}
-                  className="mr-auto border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="mr-auto border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Eliminar
@@ -575,41 +572,41 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
       {showMembersModal && membersAccount && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8 w-full max-w-3xl relative max-h-[88vh] overflow-y-auto">
+          <div className="bg-card rounded-lg shadow-lg p-5 sm:p-8 w-full max-w-3xl relative max-h-[88vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-1">Gestionar miembros</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Account: <span className="font-semibold text-gray-900">{membersAccount.name}</span>
+            <p className="text-sm text-muted-foreground mb-4">
+              Cuenta: <span className="font-semibold text-foreground">{membersAccount.name}</span>
             </p>
 
             {membersError && (
-              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {membersError}
               </div>
             )}
 
             {membersNotice && (
-              <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
                 {membersNotice}
               </div>
             )}
 
-            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Owner</p>
+            <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Owner</p>
               <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="font-semibold text-slate-900">
-                  {membersAccount.owner_id === user?.id ? `${currentUserLabel} (You)` : shortId(membersAccount.owner_id)}
+                <p className="font-semibold text-foreground">
+                  {membersAccount.owner_id === user?.id ? `${currentUserLabel} (Tú)` : shortId(membersAccount.owner_id)}
                 </p>
-                <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">owner</span>
+                <span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold text-foreground">owner</span>
               </div>
-              <p className="mt-1 text-xs text-slate-500">{membersAccount.owner_id}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{membersAccount.owner_id}</p>
             </div>
 
             {isOwnerOfMembersAccount ? (
-              <form onSubmit={handleAddMember} className="mb-6 rounded-lg border border-slate-200 p-4">
-                <p className="mb-3 text-sm font-medium text-slate-700">Add Member</p>
+              <form onSubmit={handleAddMember} className="mb-6 rounded-lg border border-border p-4">
+                <p className="mb-3 text-sm font-medium text-foreground">Agregar miembro</p>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_auto] md:items-end">
                   <div>
-                    <label className="mb-1 block text-sm text-slate-600">Email or User UUID</label>
+                    <label className="mb-1 block text-sm text-muted-foreground">Email o UUID del usuario</label>
                     <Input
                       type="text"
                       placeholder="member@email.com or UUID"
@@ -620,7 +617,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm text-slate-600">Role</label>
+                    <label className="mb-1 block text-sm text-muted-foreground">Rol</label>
                     <select
                       value={memberForm.role}
                       onChange={(e) => setMemberForm(prev => ({ ...prev, role: e.target.value }))}
@@ -634,23 +631,23 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                   </div>
 
                   <Button type="submit" disabled={membersBusy} className="h-10">
-                    {membersBusy ? 'Adding...' : 'Add'}
+                    {membersBusy ? 'Agregando...' : 'Agregar'}
                   </Button>
                 </div>
               </form>
             ) : (
-              <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                You can view members, but only the account owner can modify them.
+              <div className="mb-6 rounded-md border border-secondary bg-secondary/40 px-3 py-2 text-sm text-secondary-foreground">
+                Puedes ver miembros, pero solo el propietario puede modificarlos.
               </div>
             )}
 
             <div>
-              <p className="mb-3 text-sm font-semibold text-slate-700">Current Members</p>
+              <p className="mb-3 text-sm font-semibold text-foreground">Current Members</p>
 
               {membersLoading ? (
-                <p className="text-sm text-slate-500">Loading members...</p>
+                <p className="text-sm text-muted-foreground">Cargando miembros...</p>
               ) : members.length === 0 ? (
-                <p className="text-sm text-slate-500">No members added yet.</p>
+                <p className="text-sm text-muted-foreground">Aún no hay miembros agregados.</p>
               ) : (
                 <div className="space-y-3">
                   {members.map(member => {
@@ -658,14 +655,14 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                     const isCurrentUser = member.user_id === user?.id
 
                     return (
-                      <div key={member.user_id} className="rounded-lg border border-slate-200 p-3">
+                      <div key={member.user_id} className="rounded-lg border border-border p-3">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                           <div>
-                            <p className="font-semibold text-slate-900">
-                              {displayName} {isCurrentUser ? '(You)' : ''}
+                            <p className="font-semibold text-foreground">
+                              {displayName} {isCurrentUser ? '(Tú)' : ''}
                             </p>
-                            <p className="text-xs text-slate-500">{member.user_id}</p>
-                            <p className="mt-1 text-xs text-slate-400">Added: {formatDate(member.created_at)}</p>
+                            <p className="text-xs text-muted-foreground">{member.user_id}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Added: {formatDate(member.created_at)}</p>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
@@ -686,9 +683,9 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                                 variant="outline"
                                 disabled={membersBusy}
                                 onClick={() => handleRemoveMember(member)}
-                                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 w-full sm:w-auto"
+                                className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto"
                               >
-                                Remove
+                                Eliminar
                               </Button>
                             )}
                           </div>
@@ -701,7 +698,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
             </div>
 
             <div className="mt-6 flex justify-end">
-              <Button type="button" variant="outline" onClick={closeMembersModal}>Close</Button>
+              <Button type="button" variant="outline" onClick={closeMembersModal}>Cerrar</Button>
             </div>
           </div>
         </div>
@@ -709,29 +706,29 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
       {showContributionModal && contributionAccount && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8 w-full max-w-2xl relative max-h-[88vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-1">Contribute To Shared Account</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Destination account: <span className="font-semibold text-gray-900">{contributionAccount.name}</span>
+          <div className="bg-card rounded-lg shadow-lg p-5 sm:p-8 w-full max-w-2xl relative max-h-[88vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-1">Aportar a cuenta compartida</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Cuenta destino: <span className="font-semibold text-foreground">{contributionAccount.name}</span>
             </p>
 
             {contributionError && (
-              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {contributionError}
               </div>
             )}
             {contributionNotice && (
-              <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
                 {contributionNotice}
               </div>
             )}
 
             {contributionLoading ? (
-              <p className="text-sm text-slate-500">Loading contribution options...</p>
+              <p className="text-sm text-muted-foreground">Cargando opciones de aporte...</p>
             ) : (
               <form onSubmit={handleContributionSubmit} className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-sm text-slate-600">From Personal Wallet</label>
+                  <label className="mb-1 block text-sm text-muted-foreground">Desde billetera personal</label>
                   <select
                     value={contributionForm.from_wallet}
                     onChange={(e) => setContributionForm(prev => ({ ...prev, from_wallet: e.target.value }))}
@@ -740,14 +737,14 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                   >
                     {sourceWallets.map(wallet => (
                       <option key={wallet.id} value={wallet.id}>
-                        {wallet.icon || '💰'} {wallet.name} ({wallet.account_name}) - {formatCOP(wallet.balance)}
+                        {wallet.name} ({wallet.account_name}) - {formatCOP(wallet.balance)}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm text-slate-600">To Shared Wallet</label>
+                  <label className="mb-1 block text-sm text-muted-foreground">Hacia billetera compartida</label>
                   <select
                     value={contributionForm.to_wallet}
                     onChange={(e) => setContributionForm(prev => ({ ...prev, to_wallet: e.target.value }))}
@@ -756,14 +753,14 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                   >
                     {targetWallets.map(wallet => (
                       <option key={wallet.id} value={wallet.id}>
-                        {wallet.icon || '💰'} {wallet.name} - {formatCOP(wallet.balance)}
+                        {wallet.name} - {formatCOP(wallet.balance)}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm text-slate-600">Amount</label>
+                  <label className="mb-1 block text-sm text-muted-foreground">Monto</label>
                   <Input
                     type="text"
                     placeholder="0"
@@ -813,16 +810,16 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       </Button>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">
-                    Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(contributionForm.amount))}</span>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(contributionForm.amount))}</span>
                   </p>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm text-slate-600">Note (optional)</label>
+                  <label className="mb-1 block text-sm text-muted-foreground">Nota (opcional)</label>
                   <Input
                     type="text"
-                    placeholder="Monthly contribution"
+                    placeholder="Aporte mensual"
                     value={contributionForm.note}
                     onChange={(e) => setContributionForm(prev => ({ ...prev, note: e.target.value }))}
                     disabled={contributionSubmitting}
@@ -831,14 +828,14 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
                 <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
                   <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeContributionModal}>
-                    Close
+                    Cerrar
                   </Button>
                   <Button
                     type="submit"
-                    className="w-full sm:w-auto bg-[#1f5fe8] hover:bg-[#1852cd]"
+                    className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
                     disabled={contributionSubmitting || sourceWallets.length === 0 || targetWallets.length === 0}
                   >
-                    {contributionSubmitting ? 'Processing...' : 'Contribute'}
+                    {contributionSubmitting ? 'Procesando...' : 'Aportar'}
                   </Button>
                 </div>
               </form>
@@ -853,12 +850,12 @@ export default function Accounts({ setPage, setSelectedAccount }) {
           const Icon = visual.icon
           const isPrimary = account.owner_id === user?.id
           const isShared = isSharedAccount(account)
-          const ownerLabel = isPrimary ? currentUserLabel : 'Account Owner'
+          const ownerLabel = isPrimary ? currentUserLabel : 'Propietario'
 
           return (
             <article
               key={account.id}
-              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.06)]"
+              className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_6px_20px_rgba(15,23,42,0.06)]"
             >
               <div className={`flex h-40 items-center justify-center ${visual.container}`}>
                 <Icon className="h-14 w-14" strokeWidth={1.8} />
@@ -866,28 +863,28 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
               <div className="p-6">
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="break-words text-xl font-bold text-slate-900">{account.name}</h3>
+                  <h3 className="break-words text-xl font-bold text-foreground">{account.name}</h3>
                   <div className="flex flex-wrap justify-end gap-2">
                     {isPrimary && (
-                      <span className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-bold tracking-[0.14em] text-emerald-700">
+                      <span className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold tracking-[0.14em] text-primary">
                         PRIMARY
                       </span>
                     )}
-                    <span className={`rounded-lg px-3 py-1 text-xs font-bold tracking-[0.12em] ${isShared ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`rounded-lg px-3 py-1 text-xs font-bold tracking-[0.12em] ${isShared ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                       {isShared ? 'SHARED' : 'PERSONAL'}
                     </span>
                   </div>
                 </div>
 
-                <p className="mt-2 text-sm text-slate-600">Owner: {ownerLabel}</p>
-                <p className="mt-1 text-sm italic text-slate-400">Created: {formatDate(account.created_at)}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Owner: {ownerLabel}</p>
+                <p className="mt-1 text-sm italic text-muted-foreground">Created: {formatDate(account.created_at)}</p>
 
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-5">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => openMembersModal(account)}
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#1f5fe8] transition-colors hover:text-[#184ac0]"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
                     >
                       <UserPlus className="h-5 w-5" />
                       Gestionar miembros
@@ -897,20 +894,20 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       <button
                         type="button"
                         onClick={() => openContributionModal(account)}
-                        className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 transition-colors hover:text-emerald-800"
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary"
                       >
                         <ArrowRightLeft className="h-4 w-4" />
-                        Contribute
+                        Aportar
                       </button>
                     )}
 
                     <button
                       type="button"
                       onClick={() => handleEdit(account)}
-                      className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-700"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <Pencil className="h-4 w-4" />
-                      Edit
+                      Editar
                     </button>
                   </div>
 
@@ -919,7 +916,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       setSelectedAccount(account.id)
                       setPage('wallets')
                     }}
-                    className="h-10 min-w-[120px] rounded-xl bg-[#1f5fe8] text-sm font-semibold hover:bg-[#1852cd]"
+                    className="h-10 min-w-[120px] rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90"
                   >
                     Abrir
                   </Button>
@@ -932,25 +929,25 @@ export default function Accounts({ setPage, setSelectedAccount }) {
         <button
           type="button"
           onClick={openCreateForm}
-          className="flex min-h-[240px] sm:min-h-[356px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white/60 px-6 sm:px-10 text-center transition-colors hover:border-[#98afe8] hover:bg-white"
+          className="flex min-h-[240px] sm:min-h-[356px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card/60 px-6 sm:px-10 text-center transition-colors hover:border-primary/40 hover:bg-card"
         >
-          <span className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+          <span className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Plus className="h-10 w-10" />
           </span>
-          <h3 className="text-xl font-bold text-slate-900">Agregar otra cuenta</h3>
-          <p className="mt-2 text-sm text-slate-500">Gestiona múltiples fondos por separado</p>
+          <h3 className="text-xl font-bold text-foreground">Agregar otra cuenta</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Gestiona múltiples fondos por separado</p>
         </button>
       </div>
 
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+      <section className="mt-8 rounded-xl border border-border bg-card p-5 sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Historial de aportes entre cuentas</h2>
-            <p className="text-sm text-slate-500">Consulta transferencias entre cuentas personales y compartidas.</p>
+            <h2 className="text-lg font-semibold text-foreground">Historial de aportes entre cuentas</h2>
+            <p className="text-sm text-muted-foreground">Consulta transferencias entre cuentas personales y compartidas.</p>
           </div>
 
           <div className="w-full sm:w-72">
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Filtrar por cuenta</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Filtrar por cuenta</label>
             <select
               value={transferFilterAccount}
               onChange={(e) => setTransferFilterAccount(e.target.value)}
@@ -965,32 +962,32 @@ export default function Accounts({ setPage, setSelectedAccount }) {
         </div>
 
         {transfersError && (
-          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          <div className="mb-4 rounded-md border border-secondary bg-secondary/40 px-3 py-2 text-sm text-secondary-foreground">
             {transfersError}
           </div>
         )}
 
         {transfersLoading ? (
-          <p className="text-sm text-slate-500">Cargando aportes...</p>
+          <p className="text-sm text-muted-foreground">Cargando aportes...</p>
         ) : filteredTransfers.length === 0 ? (
-          <p className="text-sm text-slate-500">Aún no hay aportes registrados.</p>
+          <p className="text-sm text-muted-foreground">Aún no hay aportes registrados.</p>
         ) : (
           <div className="space-y-3">
             {filteredTransfers.slice(0, 40).map(transfer => (
-              <article key={transfer.id} className="rounded-lg border border-slate-200 p-3 sm:p-4">
+              <article key={transfer.id} className="rounded-lg border border-border p-3 sm:p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-foreground">
                       {getAccountDisplayName(transfer.from_account_id)} ({getWalletDisplayName(transfer.from_wallet_id)}) {'->'} {getAccountDisplayName(transfer.to_account_id)} ({getWalletDisplayName(transfer.to_wallet_id)})
                     </p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       Por {getTransferAuthorLabel(transfer.created_by)} - {formatDateTime(transfer.created_at)}
                     </p>
                     {transfer.note && (
-                      <p className="mt-1 text-xs text-slate-600">Nota: {transfer.note}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Nota: {transfer.note}</p>
                     )}
                   </div>
-                  <span className="text-sm font-bold text-emerald-700">{formatCOP(transfer.amount)}</span>
+                  <span className="text-sm font-bold text-primary">{formatCOP(transfer.amount)}</span>
                 </div>
               </article>
             ))}
@@ -998,22 +995,22 @@ export default function Accounts({ setPage, setSelectedAccount }) {
         )}
       </section>
 
-      <div className="mt-8 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3 text-slate-600">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+      <div className="mt-8 flex flex-col gap-4 rounded-xl border border-border bg-card px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Info className="h-4 w-4" />
           </span>
           <p className="text-sm leading-relaxed">
-            Need help setting up a business account?
-            <button type="button" className="ml-1 font-semibold text-[#1f5fe8] hover:text-[#184ac0]">
-              Contact Support
+            ¿Necesitas ayuda configurando una cuenta empresarial?
+            <button type="button" className="ml-1 font-semibold text-primary hover:text-primary/80">
+              Contactar soporte
             </button>
           </p>
         </div>
 
-        <div className="flex items-center gap-6 text-sm font-semibold text-slate-500">
-          <button type="button" className="hover:text-slate-700">Privacy Policy</button>
-          <button type="button" className="hover:text-slate-700">Terms of Service</button>
+        <div className="flex items-center gap-6 text-sm font-semibold text-muted-foreground">
+          <button type="button" className="hover:text-foreground">Privacy Policy</button>
+          <button type="button" className="hover:text-foreground">Terms of Service</button>
         </div>
       </div>
     </div>

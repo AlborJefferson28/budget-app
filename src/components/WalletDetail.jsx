@@ -4,13 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
+import { Skeleton } from './ui/Skeleton'
 import { ArrowLeft, Edit, Trash2, Download, Shield, QrCode, Check, X } from 'lucide-react'
 import { formatCOP, parseCOP } from '../lib/currency'
+import { IconGlyph, WALLET_ICON_OPTIONS, normalizeIconKey } from '../lib/icons'
 
-const iconOptions = [
-  '💰', '🏦', '💳', '📱', '💸', '🤑', '💵', '💎', '🏆', '🎯', '🚀', '🌟',
-  '💼', '🛒', '🏠', '🚗', '✈️', '🍔', '🎮', '📚', '🎵', '🏃', '💪', '❤️'
-]
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
 
 const normalizeCOPAmount = (value) => {
@@ -37,7 +35,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
   const [editNotice, setEditNotice] = useState('')
   const [editForm, setEditForm] = useState({
     name: wallet.name,
-    icon: wallet.icon,
+    icon: normalizeIconKey(wallet.icon, 'wallet'),
     balanceInput: String(normalizeCOPAmount(wallet.balance))
   })
 
@@ -45,7 +43,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
     setCurrentWallet(wallet)
     setEditForm({
       name: wallet.name,
-      icon: wallet.icon,
+      icon: normalizeIconKey(wallet.icon, 'wallet'),
       balanceInput: String(normalizeCOPAmount(wallet.balance)),
     })
     setIsEditing(false)
@@ -84,7 +82,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
     if (isEditing) {
       setEditForm({
         name: currentWallet.name,
-        icon: currentWallet.icon,
+        icon: normalizeIconKey(currentWallet.icon, 'wallet'),
         balanceInput: String(normalizeCOPAmount(currentWallet.balance)),
       })
     }
@@ -94,7 +92,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
   const handleSave = async () => {
     const payload = {
       name: editForm.name.trim(),
-      icon: editForm.icon,
+      icon: normalizeIconKey(editForm.icon, 'wallet'),
       balance: normalizeCOPAmount(editForm.balanceInput),
     }
 
@@ -140,15 +138,20 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {iconOptions.map((icon) => (
-                          <SelectItem key={icon} value={icon}>
-                            {icon}
+                        {WALLET_ICON_OPTIONS.map((iconOption) => (
+                          <SelectItem key={iconOption.key} value={iconOption.key}>
+                            <div className="flex items-center gap-2">
+                              <IconGlyph value={iconOption.key} className="h-4 w-4" />
+                              <span>{iconOption.label}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className="text-4xl">{currentWallet.icon}</span>
+                    <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <IconGlyph value={currentWallet.icon} fallback="wallet" className="h-7 w-7" />
+                    </span>
                   )}
                   <div className="min-w-0">
                     {isEditing ? (
@@ -192,19 +195,19 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
             </CardHeader>
             <CardContent>
               {editError && (
-                <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {editError}
                 </div>
               )}
               {editNotice && (
-                <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
                   {editNotice}
                 </div>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div>
-                  <p className="text-sm text-gray-500">Balance</p>
+                  <p className="text-sm text-muted-foreground">Balance</p>
                   {isEditing ? (
                     <div>
                       <Input
@@ -258,24 +261,24 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
                           </Button>
                         ))}
                       </div>
-                      <p className="mt-2 text-xs text-slate-500">
-                        Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(editForm.balanceInput))}</span>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(editForm.balanceInput))}</span>
                       </p>
                     </div>
                   ) : (
-                    <p className="text-3xl font-bold text-green-600">{formatCOP(currentWallet.balance)}</p>
+                    <p className="text-3xl font-bold text-primary">{formatCOP(currentWallet.balance)}</p>
                   )}
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Moneda</p>
+                  <p className="text-sm text-muted-foreground">Moneda</p>
                   <p className="text-lg">COP</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Creada</p>
+                  <p className="text-sm text-muted-foreground">Creada</p>
                   <p className="text-lg">{formatDateLabel(currentWallet.created_at)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Última actividad</p>
+                  <p className="text-sm text-muted-foreground">Última actividad</p>
                   <p className="text-lg">{formatDateLabel(latestActivity)}</p>
                 </div>
               </div>
@@ -296,7 +299,11 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
             </CardHeader>
             <CardContent>
               {transactionsLoading ? (
-                <p>Cargando transacciones...</p>
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                </div>
               ) : recentWalletTransactions.length > 0 ? (
                 <div className="space-y-3">
                   {recentWalletTransactions.map(transaction => (
@@ -305,18 +312,18 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
                         <p className="font-medium">
                           {transaction.type === 'transfer' ? 'Transferencia' : transaction.type}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                           {new Date(transaction.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <p className={`font-bold ${transaction.to_wallet === currentWallet.id ? 'text-green-600' : 'text-red-600'}`}>
+                      <p className={`font-bold ${transaction.to_wallet === currentWallet.id ? 'text-primary' : 'text-destructive'}`}>
                         {transaction.to_wallet === currentWallet.id ? '+' : '-'}{formatCOP(transaction.amount)}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500">No hay transacciones recientes</p>
+                <p className="text-muted-foreground">No hay transacciones recientes</p>
               )}
             </CardContent>
           </Card>
@@ -332,17 +339,17 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Tu wallet está protegida con encriptación de nivel bancario.
               </p>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm">Autenticación 2FA</span>
-                  <span className="text-green-600">Activada</span>
+                  <span className="text-primary">Activada</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm">Encriptación</span>
-                  <span className="text-green-600">AES-256</span>
+                  <span className="text-primary">AES-256</span>
                 </div>
               </div>
             </CardContent>
@@ -357,11 +364,11 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
             </CardHeader>
             <CardContent>
               <div className="flex justify-center">
-                <div className="w-32 h-32 bg-gray-200 flex items-center justify-center rounded-lg">
-                  <QrCode className="w-16 h-16 text-gray-400" />
+                <div className="w-32 h-32 bg-muted flex items-center justify-center rounded-lg">
+                  <QrCode className="w-16 h-16 text-muted-foreground" />
                 </div>
               </div>
-              <p className="text-xs text-center text-gray-500 mt-2">
+              <p className="text-xs text-center text-muted-foreground mt-2">
                 Escanea para compartir dirección
               </p>
             </CardContent>

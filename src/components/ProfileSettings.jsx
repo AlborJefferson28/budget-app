@@ -5,6 +5,7 @@ import { profilesService } from '../services'
 import { supabase } from '../supabaseClient'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
+import { ProfileSkeleton } from './RouteSkeletons'
 
 const DELETE_CONFIRM_TEXT = 'ELIMINAR'
 
@@ -156,86 +157,86 @@ export default function ProfileSettings() {
     setDeletingAccount(false)
   }
 
+  if (profileLoading) {
+    return <ProfileSkeleton />
+  }
+
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
-      <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+      <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
         <div className="mb-5 flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
             <UserRound className="h-4 w-4" />
           </span>
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">Perfil de usuario</h1>
-            <p className="text-sm text-slate-500">Actualiza tu información básica.</p>
+            <h1 className="text-lg font-semibold text-foreground">Perfil de usuario</h1>
+            <p className="text-sm text-muted-foreground">Actualiza tu información básica.</p>
           </div>
         </div>
 
         {profileError && (
-          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {profileError}
           </div>
         )}
 
         {profileNotice && (
-          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             {profileNotice}
           </div>
         )}
 
-        {profileLoading ? (
-          <p className="text-sm text-slate-500">Cargando perfil...</p>
-        ) : (
-          <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm text-slate-600">Email</label>
-              <Input value={user?.email || ''} disabled />
-            </div>
+        <form onSubmit={handleSaveProfile} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm text-muted-foreground">Email</label>
+            <Input value={user?.email || ''} disabled />
+          </div>
 
-            <div>
-              <label className="mb-1 block text-sm text-slate-600">Nombre visible</label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Tu nombre"
-                disabled={profileSaving}
-              />
-            </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted-foreground">Nombre visible</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Tu nombre"
+              disabled={profileSaving}
+            />
+          </div>
 
-            <div className="flex justify-end">
-              <Button type="submit" className="h-10 bg-[#1f5fe8] text-sm font-semibold hover:bg-[#1852cd]" disabled={profileSaving}>
-                <Save className="mr-2 h-4 w-4" />
-                {profileSaving ? 'Guardando...' : 'Guardar perfil'}
-              </Button>
-            </div>
-          </form>
-        )}
+          <div className="flex justify-end">
+            <Button type="submit" className="h-10 text-sm font-semibold" disabled={profileSaving}>
+              <Save className="mr-2 h-4 w-4" />
+              {profileSaving ? 'Guardando...' : 'Guardar perfil'}
+            </Button>
+          </div>
+        </form>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+      <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
         <div className="mb-5 flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
             <KeyRound className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Configuración de seguridad</h2>
-            <p className="text-sm text-slate-500">Cambia tu contraseña.</p>
+            <h2 className="text-lg font-semibold text-foreground">Configuración de seguridad</h2>
+            <p className="text-sm text-muted-foreground">Cambia tu contraseña.</p>
           </div>
         </div>
 
         {passwordError && (
-          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {passwordError}
           </div>
         )}
 
         {passwordNotice && (
-          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             {passwordNotice}
           </div>
         )}
 
         <form onSubmit={handlePasswordUpdate} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-slate-600">Nueva contraseña</label>
+            <label className="mb-1 block text-sm text-muted-foreground">Nueva contraseña</label>
             <Input
               type="password"
               value={passwordForm.password}
@@ -246,7 +247,7 @@ export default function ProfileSettings() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-slate-600">Confirmar contraseña</label>
+            <label className="mb-1 block text-sm text-muted-foreground">Confirmar contraseña</label>
             <Input
               type="password"
               value={passwordForm.confirmPassword}
@@ -257,31 +258,31 @@ export default function ProfileSettings() {
           </div>
 
           <div className="flex justify-end">
-            <Button type="submit" className="h-10 bg-[#1f5fe8] text-sm font-semibold hover:bg-[#1852cd]" disabled={passwordSaving}>
+            <Button type="submit" className="h-10 text-sm font-semibold" disabled={passwordSaving}>
               {passwordSaving ? 'Actualizando...' : 'Actualizar contraseña'}
             </Button>
           </div>
         </form>
       </section>
 
-      <section className="rounded-xl border border-red-200 bg-red-50/40 p-5 sm:p-6">
+      <section className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 sm:p-6">
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100 text-red-700">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/20 text-destructive">
             <ShieldAlert className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold text-red-900">Zona de peligro</h2>
-            <p className="text-sm text-red-700">Esta acción elimina únicamente tu cuenta de usuario.</p>
+            <h2 className="text-lg font-semibold text-destructive">Zona de peligro</h2>
+            <p className="text-sm text-destructive">Esta acción elimina únicamente tu cuenta de usuario.</p>
           </div>
         </div>
 
-        <div className="mb-4 rounded-md border border-red-200 bg-white px-3 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-md border border-destructive/30 bg-card px-3 py-3 text-sm text-destructive">
           <p className="font-medium">Se eliminará tu acceso de autenticación y no podrás iniciar sesión nuevamente con este usuario.</p>
           <p className="mt-1">Para continuar, escribe <span className="font-semibold">{DELETE_CONFIRM_TEXT}</span>.</p>
         </div>
 
         {deleteError && (
-          <div className="mb-4 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-800">
+          <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/20 px-3 py-2 text-sm text-destructive">
             {deleteError}
           </div>
         )}

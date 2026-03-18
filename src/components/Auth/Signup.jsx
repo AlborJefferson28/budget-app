@@ -7,7 +7,7 @@ import { Mail, Lock, Eye, EyeOff, Chrome, Apple } from 'lucide-react'
 
 function ErrMsg({ msg }) {
   if (!msg) return null;
-  return <div className="text-red-600 text-sm mb-3 p-3 bg-red-50 rounded-lg">{msg}</div>;
+  return <div className="text-destructive text-sm mb-3 p-3 bg-destructive/10 rounded-lg border border-destructive/20">{msg}</div>;
 }
 
 export default function Signup({ onSwitchToLogin }) {
@@ -41,27 +41,27 @@ export default function Signup({ onSwitchToLogin }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-6 sm:py-8">
+    <div className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-6 sm:py-8">
       <div className="w-full max-w-md">
         {/* Logo y título */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
+            <svg className="w-8 h-8 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Budget App</h1>
-          <p className="text-gray-600">Create your account to get started.</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Budget App</h1>
+          <p className="text-muted-foreground">Create your account to get started.</p>
         </div>
 
         {/* Formulario */}
-        <Card className="shadow-lg">
+        <Card className="border border-border">
           <CardContent className="p-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type="email"
                     value={email}
@@ -73,9 +73,9 @@ export default function Signup({ onSwitchToLogin }) {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     value={password}
@@ -87,16 +87,16 @@ export default function Signup({ onSwitchToLogin }) {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Confirm Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
@@ -108,7 +108,7 @@ export default function Signup({ onSwitchToLogin }) {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -120,10 +120,10 @@ export default function Signup({ onSwitchToLogin }) {
                   type="checkbox"
                   checked={acceptTerms}
                   onChange={(e) => setAcceptTerms(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-primary focus:ring-ring border-border rounded bg-background"
                 />
-                <label htmlFor="acceptTerms" className="ml-2 block text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-blue-600 hover:text-blue-500">Terms and Conditions</a>
+                <label htmlFor="acceptTerms" className="ml-2 block text-sm text-foreground">
+                  I agree to the <a href="#" className="text-primary hover:text-primary/80">Terms and Conditions</a>
                 </label>
               </div>
               <ErrMsg msg={error} />
@@ -136,10 +136,10 @@ export default function Signup({ onSwitchToLogin }) {
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
+                  <div className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                  <span className="px-2 bg-card text-muted-foreground">Or continue with</span>
                 </div>
               </div>
             </div>
@@ -160,9 +160,9 @@ export default function Signup({ onSwitchToLogin }) {
 
         {/* Enlace a login */}
         <div className="text-center mt-6">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
-            <button onClick={onSwitchToLogin} className="font-medium text-blue-600 hover:text-blue-500">
+            <button onClick={onSwitchToLogin} className="font-medium text-primary hover:text-primary/80">
               Sign in
             </button>
           </p>

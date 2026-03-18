@@ -7,7 +7,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, Chrome, Apple } from 'lucide-react
 
 function ErrMsg({ msg }) {
   if (!msg) return null;
-  return <div className="text-red-600 text-sm mb-3 p-3 bg-red-50 rounded-lg">{msg}</div>;
+  return <div className="text-destructive text-sm mb-3 p-3 bg-destructive/10 rounded-lg border border-destructive/20">{msg}</div>;
 }
 
 export default function Login({ onSwitchToSignup }) {
@@ -31,27 +31,27 @@ export default function Login({ onSwitchToSignup }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 py-6 sm:py-8">
+    <div className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-6 sm:py-8">
       <div className="w-full max-w-md">
         {/* Logo y título */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
+            <svg className="w-8 h-8 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Budget App</h1>
-          <p className="text-gray-600">Welcome back! Please sign in to your account.</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Budget App</h1>
+          <p className="text-muted-foreground">Welcome back! Please sign in to your account.</p>
         </div>
 
         {/* Formulario */}
-        <Card className="shadow-lg">
+        <Card className="border border-border">
           <CardContent className="p-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type="email"
                     value={email}
@@ -64,11 +64,11 @@ export default function Login({ onSwitchToSignup }) {
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Password</label>
-                  <button type="button" className="text-sm text-blue-600 hover:text-blue-800">Forgot password?</button>
+                  <label className="block text-sm font-medium text-foreground">Password</label>
+                  <button type="button" className="text-sm text-primary hover:text-primary/80">Forgot password?</button>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     value={password}
@@ -80,7 +80,7 @@ export default function Login({ onSwitchToSignup }) {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -92,12 +92,12 @@ export default function Login({ onSwitchToSignup }) {
                   type="checkbox"
                   checked={keepLoggedIn}
                   onChange={(e) => setKeepLoggedIn(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-ring"
                 />
-                <label htmlFor="keep-logged-in" className="ml-2 text-sm text-gray-700">Keep me logged in</label>
+                <label htmlFor="keep-logged-in" className="ml-2 text-sm text-foreground">Keep me logged in</label>
               </div>
               <ErrMsg msg={error} />
-              <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center">
+              <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-4 rounded-lg flex items-center justify-center">
                 {loading ? 'Signing in...' : 'Sign in'}
                 {!loading && <ArrowRight className="ml-2 w-5 h-5" />}
               </Button>
@@ -107,10 +107,10 @@ export default function Login({ onSwitchToSignup }) {
             <div className="mt-6 mb-4">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
+                  <div className="w-full border-t border-border"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                  <span className="px-2 bg-card text-muted-foreground">Or continue with</span>
                 </div>
               </div>
             </div>
@@ -129,9 +129,9 @@ export default function Login({ onSwitchToSignup }) {
 
             {/* Enlace para registrarse */}
             <div className="text-center mt-6">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Don't have an account?{' '}
-                <button onClick={onSwitchToSignup} className="text-blue-600 hover:text-blue-800 font-medium">
+                <button onClick={onSwitchToSignup} className="text-primary hover:text-primary/80 font-medium">
                   Sign up
                 </button>
               </p>
@@ -140,10 +140,10 @@ export default function Login({ onSwitchToSignup }) {
         </Card>
 
         {/* Footer */}
-        <div className="mt-8 text-xs text-gray-500 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-          <a href="#" className="hover:text-gray-700">Privacy Policy</a>
-          <a href="#" className="hover:text-gray-700">Terms of Service</a>
-          <a href="#" className="hover:text-gray-700">Help</a>
+        <div className="mt-8 text-xs text-muted-foreground flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          <a href="#" className="hover:text-foreground">Privacy Policy</a>
+          <a href="#" className="hover:text-foreground">Terms of Service</a>
+          <a href="#" className="hover:text-foreground">Help</a>
         </div>
       </div>
     </div>

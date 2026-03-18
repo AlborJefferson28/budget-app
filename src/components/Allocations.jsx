@@ -11,6 +11,8 @@ import { Input } from './ui/Input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/Select';
 import { formatCOP, parseCOP } from '../lib/currency';
 import { accountTransfersService, walletsService } from '../services';
+import { IconGlyph } from '../lib/icons';
+import { AllocationsSkeleton } from './RouteSkeletons';
 
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000];
 
@@ -20,20 +22,20 @@ const normalizeCOPAmount = (value) => {
 };
 
 const STATUS = {
-  completed: { label: 'Completada', color: 'bg-green-100 text-green-700' },
-  processing: { label: 'En proceso', color: 'bg-blue-100 text-blue-700' },
+  completed: { label: 'Completada', color: 'bg-primary/10 text-primary' },
+  processing: { label: 'En proceso', color: 'bg-secondary text-secondary-foreground' },
 };
 
 const getAllocationType = (amount, average) => {
   if (!average || average <= 0) {
-    return { label: 'Media', color: 'bg-slate-100 text-slate-700 border-slate-200' };
+    return { label: 'Media', color: 'bg-muted text-muted-foreground border-border' };
   }
 
   if (amount >= average) {
-    return { label: 'Mas', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    return { label: 'Mas', color: 'bg-primary/10 text-primary border-primary/30' };
   }
 
-  return { label: 'Menos', color: 'bg-amber-100 text-amber-700 border-amber-200' };
+  return { label: 'Menos', color: 'bg-destructive/10 text-destructive border-destructive/30' };
 };
 
 function getStatus(idx) {
@@ -153,10 +155,26 @@ export default function Allocations({ accountId, setPage }) {
     return { name, count: allocationCount };
   }, [allocations]);
 
-  const budgetCoverage = useMemo(() => {
-    if (budgets.length === 0) return 0;
-    const uniqueBudgets = new Set(allocations.map(a => a.budget_id).filter(id => id));
-    return Math.round((uniqueBudgets.size / budgets.length) * 100);
+  const budgetProgressMetrics = useMemo(() => {
+    if (budgets.length === 0) {
+      return { averageProgress: 0, completedBudgets: 0 };
+    }
+
+    const progressValues = budgets.map((budget) => {
+      const allocated = allocations
+        .filter(allocation => allocation.budget_id === budget.id)
+        .reduce((sum, allocation) => sum + (allocation.amount || 0), 0);
+
+      if (!budget.target || budget.target <= 0) return 0;
+      return Math.min((allocated / budget.target) * 100, 100);
+    });
+
+    const averageProgress = Math.round(
+      progressValues.reduce((sum, progress) => sum + progress, 0) / budgets.length
+    );
+    const completedBudgets = progressValues.filter(progress => progress >= 100).length;
+
+    return { averageProgress, completedBudgets };
   }, [allocations, budgets]);
 
   const averageAllocation = useMemo(() => {
@@ -242,8 +260,8 @@ export default function Allocations({ accountId, setPage }) {
     setShowForm(true);
   };
 
-  if (loading) return <div className="p-8">Cargando...</div>;
-  if (error) return <div className="p-8 text-red-500">Error: {error.message}</div>;
+  if (loading) return <AllocationsSkeleton />;
+  if (error) return <div className="p-8 text-destructive">Error: {error.message}</div>;
 
   return (
     <div className="p-4 sm:p-6">
@@ -273,28 +291,28 @@ export default function Allocations({ accountId, setPage }) {
         <CardContent className="p-0">
           <div className="md:hidden p-4 space-y-3">
             {paged.map((allocation, idx) => (
-              <div key={allocation.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
+              <div key={allocation.id} className="rounded-lg border border-border p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-xs text-muted-foreground">BILLETERA ORIGEN</p>
-                    <div className="mt-1 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5">
-                      <span className="text-lg">{allocation.wallets?.icon || '💰'}</span>
-                      <p className="font-semibold text-blue-900">{allocation.wallets?.name || 'Sin nombre'}</p>
+                    <div className="mt-1 inline-flex items-center gap-2 rounded-md border border-border bg-primary/10 px-2.5 py-1.5">
+                      <IconGlyph value={allocation.wallets?.icon} fallback="wallet" className="h-4 w-4 text-primary" />
+                      <p className="font-semibold text-foreground">{allocation.wallets?.name || 'Sin nombre'}</p>
                     </div>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">PRESUPUESTO DESTINO</p>
-                  <div className="mt-1 inline-flex items-center gap-2 rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1.5">
-                    <span className="text-lg">{allocation.budgets?.icon || '🏷️'}</span>
-                    <p className="font-semibold text-teal-900">{allocation.budgets?.name || 'Sin nombre'}</p>
+                  <div className="mt-1 inline-flex items-center gap-2 rounded-md border border-border bg-muted px-2.5 py-1.5">
+                    <IconGlyph value={allocation.budgets?.icon} fallback="piggy-bank" className="h-4 w-4 text-primary" />
+                    <p className="font-semibold text-foreground">{allocation.budgets?.name || 'Sin nombre'}</p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">MONTO</p>
-                    <p className="font-bold text-blue-700">{formatCOP(allocation.amount)}</p>
+                    <p className="font-bold text-primary">{formatCOP(allocation.amount)}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</p>
                 </div>
@@ -327,22 +345,22 @@ export default function Allocations({ accountId, setPage }) {
               </thead>
               <tbody>
                 {paged.map((allocation, idx) => (
-                  <tr key={allocation.id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                  <tr key={allocation.id} className="border-b last:border-0 hover:bg-muted/40 transition">
                     <td className="py-3 px-6">
-                      <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-                        <span className="text-xl">{allocation.wallets?.icon || '💰'}</span>
+                      <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-primary/10 px-3 py-2">
+                        <IconGlyph value={allocation.wallets?.icon} fallback="wallet" className="h-5 w-5 text-primary" />
                         <div>
-                          <div className="font-semibold text-blue-900">{allocation.wallets?.name || 'Sin nombre'}</div>
-                          <div className="text-xs text-blue-700/80">Cuenta origen</div>
+                          <div className="font-semibold text-foreground">{allocation.wallets?.name || 'Sin nombre'}</div>
+                          <div className="text-xs text-muted-foreground">Cuenta origen</div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-6">
-                      <div className="inline-flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
-                        <span className="text-xl">{allocation.budgets?.icon || '🏷️'}</span>
+                      <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2">
+                        <IconGlyph value={allocation.budgets?.icon} fallback="piggy-bank" className="h-5 w-5 text-primary" />
                         <div>
-                          <div className="font-semibold text-teal-900">{allocation.budgets?.name || 'Sin nombre'}</div>
-                          <div className="text-xs text-teal-700/80">Presupuesto destino</div>
+                          <div className="font-semibold text-foreground">{allocation.budgets?.name || 'Sin nombre'}</div>
+                          <div className="text-xs text-muted-foreground">Presupuesto destino</div>
                         </div>
                       </div>
                     </td>
@@ -374,7 +392,7 @@ export default function Allocations({ accountId, setPage }) {
               {[...Array(totalPages)].map((_, i) => (
                 <button
                   key={i}
-                  className={`w-8 h-8 rounded flex items-center justify-center border ${page === i + 1 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}
+                  className={`w-8 h-8 rounded flex items-center justify-center border ${page === i + 1 ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-foreground border-border hover:bg-accent'}`}
                   onClick={() => setPageNum(i + 1)}
                 >{i + 1}</button>
               ))}
@@ -388,7 +406,7 @@ export default function Allocations({ accountId, setPage }) {
         <Card>
           <CardContent className="py-6">
             <div className="text-xs text-muted-foreground mb-1">Total asignado</div>
-            <div className="text-2xl font-bold text-blue-700">{formatCOP(totalAllocated)}</div>
+            <div className="text-2xl font-bold text-primary">{formatCOP(totalAllocated)}</div>
             <div className="text-xs text-muted-foreground mt-1">{allocationPercentage.toFixed(1)}% del balance total de billeteras</div>
           </CardContent>
         </Card>
@@ -401,20 +419,22 @@ export default function Allocations({ accountId, setPage }) {
         </Card>
         <Card>
           <CardContent className="py-6">
-            <div className="text-xs text-muted-foreground mb-1">Cobertura de presupuestos</div>
+            <div className="text-xs text-muted-foreground mb-1">Cumplimiento de presupuestos</div>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{budgetCoverage}%</span>
+              <span className="text-2xl font-bold">{budgetProgressMetrics.averageProgress}%</span>
             </div>
-            <div className="mt-2 w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full rounded-full bg-blue-600" style={{ width: `${budgetCoverage}%` }} />
+            <div className="mt-2 w-full h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${budgetProgressMetrics.averageProgress}%` }} />
             </div>
-            <div className="text-xs text-muted-foreground mt-1">{new Set(allocations.map(a => a.budget_id).filter(id => id)).size} / {budgets.length} presupuestos</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {budgetProgressMetrics.completedBudgets} / {budgets.length} presupuestos completados
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
             <div className="text-xs text-muted-foreground mb-1">Asignación promedio</div>
-            <div className="text-2xl font-bold text-green-700">{formatCOP(averageAllocation)}</div>
+            <div className="text-2xl font-bold text-primary">{formatCOP(averageAllocation)}</div>
             <div className="text-xs text-muted-foreground mt-1">Por asignación</div>
           </CardContent>
         </Card>
@@ -423,10 +443,10 @@ export default function Allocations({ accountId, setPage }) {
       {/* Modal/Formulario */}
       {showForm && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Asignación' : 'Nueva Asignación'}</h3>
             {formError && (
-              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {formError}
               </div>
             )}
@@ -436,7 +456,12 @@ export default function Allocations({ accountId, setPage }) {
                 <SelectTrigger><SelectValue placeholder="Seleccionar billetera" /></SelectTrigger>
                 <SelectContent>
                   {wallets.map(wallet => (
-                    <SelectItem key={wallet.id} value={wallet.id}>{wallet.icon} {wallet.name}</SelectItem>
+                    <SelectItem key={wallet.id} value={wallet.id}>
+                      <div className="flex items-center gap-2">
+                        <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
+                        <span>{wallet.name}</span>
+                      </div>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -453,7 +478,7 @@ export default function Allocations({ accountId, setPage }) {
                   <option value="">No usar wallet personal</option>
                   {personalFundingWallets.map(wallet => (
                     <option key={wallet.id} value={wallet.id}>
-                      {wallet.icon || '💰'} {wallet.name} ({wallet.account_name}) - {formatCOP(wallet.balance)}
+                      {wallet.name} ({wallet.account_name}) - {formatCOP(wallet.balance)}
                     </option>
                   ))}
                 </select>
@@ -468,7 +493,12 @@ export default function Allocations({ accountId, setPage }) {
                 <SelectTrigger><SelectValue placeholder="Seleccionar presupuesto" /></SelectTrigger>
                 <SelectContent>
                   {budgets.map(budget => (
-                    <SelectItem key={budget.id} value={budget.id}>{budget.icon} {budget.name}</SelectItem>
+                    <SelectItem key={budget.id} value={budget.id}>
+                      <div className="flex items-center gap-2">
+                        <IconGlyph value={budget.icon} fallback="piggy-bank" className="h-4 w-4" />
+                        <span>{budget.name}</span>
+                      </div>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -526,8 +556,8 @@ export default function Allocations({ accountId, setPage }) {
                   </Button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(amountInput))}</span>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(amountInput))}</span>
               </p>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">

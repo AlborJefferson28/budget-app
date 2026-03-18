@@ -6,11 +6,9 @@ import { Input } from './ui/Input'
 import { Search, Plus, Edit, Trash2 } from 'lucide-react'
 import WalletDetail from './WalletDetail'
 import { formatCOP, parseCOP } from '../lib/currency'
+import { IconGlyph, WALLET_ICON_OPTIONS, normalizeIconKey } from '../lib/icons'
+import { WalletsSkeleton } from './RouteSkeletons'
 
-const iconOptions = [
-  '💰', '🏦', '💳', '📱', '💸', '🤑', '💵', '💎', '🏆', '🎯', '🚀', '🌟',
-  '💼', '🛒', '🏠', '🚗', '✈️', '🍔', '🎮', '📚', '🎵', '🏃', '💪', '❤️'
-]
 const QUICK_BALANCE_STEPS = [10000, 50000, 100000]
 
 const normalizeCOPAmount = (value) => {
@@ -21,7 +19,7 @@ const normalizeCOPAmount = (value) => {
 export default function Wallets({ accountId, setPage }) {
   const { wallets, loading, error, createWallet, updateWallet, deleteWallet, refetch } = useWallets(accountId)
   const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({ name: '', icon: '💰', balance: 0 })
+  const [formData, setFormData] = useState({ name: '', icon: 'wallet', balance: 0 })
   const [balanceInput, setBalanceInput] = useState('0')
   const [editing, setEditing] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -29,13 +27,13 @@ export default function Wallets({ accountId, setPage }) {
 
   const openCreateForm = () => {
     setEditing(null)
-    setFormData({ name: '', icon: '💰', balance: 0 })
+    setFormData({ name: '', icon: 'wallet', balance: 0 })
     setBalanceInput('0')
     setShowForm(true)
   }
 
   const resetForm = () => {
-    setFormData({ name: '', icon: '💰', balance: 0 })
+    setFormData({ name: '', icon: 'wallet', balance: 0 })
     setBalanceInput('0')
     setEditing(null)
     setShowForm(false)
@@ -52,6 +50,7 @@ export default function Wallets({ accountId, setPage }) {
     const payload = {
       ...formData,
       name: formData.name.trim(),
+      icon: normalizeIconKey(formData.icon, 'wallet'),
       balance: normalizeCOPAmount(balanceInput),
     }
 
@@ -65,7 +64,7 @@ export default function Wallets({ accountId, setPage }) {
 
   const handleEdit = (wallet) => {
     setEditing(wallet)
-    setFormData({ name: wallet.name, icon: wallet.icon, balance: wallet.balance })
+    setFormData({ name: wallet.name, icon: normalizeIconKey(wallet.icon, 'wallet'), balance: wallet.balance })
     setBalanceInput(String(normalizeCOPAmount(wallet.balance)))
     setShowForm(true)
   }
@@ -82,8 +81,8 @@ export default function Wallets({ accountId, setPage }) {
     return matchesSearch
   })
 
-  if (loading) return <div className="flex justify-center items-center h-64">Cargando...</div>
-  if (error) return <div className="text-red-500">Error: {error.message}</div>
+  if (loading) return <WalletsSkeleton />
+  if (error) return <div className="text-destructive">Error: {error.message}</div>
 
   if (selectedWallet) {
     return (
@@ -100,7 +99,7 @@ export default function Wallets({ accountId, setPage }) {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold">Mis billeteras</h1>
-        <Button onClick={openCreateForm} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+        <Button onClick={openCreateForm} className="w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Nueva billetera
         </Button>
@@ -108,7 +107,7 @@ export default function Wallets({ accountId, setPage }) {
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             type="text"
             placeholder="Buscar wallets..."
@@ -117,16 +116,16 @@ export default function Wallets({ accountId, setPage }) {
             className="pl-10"
           />
         </div>
-        <div className="text-sm text-slate-500 flex items-center">
+        <div className="text-sm text-muted-foreground flex items-center">
           {filteredWallets.length} billetera{filteredWallets.length === 1 ? '' : 's'}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="border-dashed border-2 border-gray-300 hover:border-blue-400 transition-colors cursor-pointer" onClick={openCreateForm}>
+        <Card className="border-dashed border-2 border-border hover:border-primary/40 transition-colors cursor-pointer" onClick={openCreateForm}>
           <CardContent className="flex flex-col items-center justify-center h-48">
-            <Plus className="w-12 h-12 text-gray-400 mb-2" />
-            <p className="text-gray-500">Crear nueva billetera</p>
+            <Plus className="w-12 h-12 text-muted-foreground mb-2" />
+            <p className="text-muted-foreground">Crear nueva billetera</p>
           </CardContent>
         </Card>
 
@@ -134,12 +133,14 @@ export default function Wallets({ accountId, setPage }) {
           <Card key={wallet.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setSelectedWallet(wallet)}>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2">
-                <span className="text-2xl">{wallet.icon}</span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <IconGlyph value={wallet.icon} fallback="wallet" className="h-5 w-5" />
+                </span>
                 {wallet.name}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-green-600 mb-4">{formatCOP(wallet.balance)}</p>
+              <p className="text-2xl font-bold text-primary mb-4">{formatCOP(wallet.balance)}</p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEdit(wallet); }}>
                   <Edit className="w-4 h-4 mr-1" />
@@ -162,7 +163,7 @@ export default function Wallets({ accountId, setPage }) {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>{editing ? 'Editar Billetera' : 'Nueva Billetera'}</CardTitle>
@@ -178,24 +179,18 @@ export default function Wallets({ accountId, setPage }) {
                 />
                 <div>
                   <label className="block text-sm font-medium mb-2">Ícono</label>
-                  <Input
-                    type="text"
-                    placeholder="Ícono personalizado"
-                    value={formData.icon}
-                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                    className="mb-2"
-                  />
                   <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
-                    {iconOptions.map((icon) => (
+                    {WALLET_ICON_OPTIONS.map((iconOption) => (
                       <Button
-                        key={icon}
+                        key={iconOption.key}
                         type="button"
-                        variant={formData.icon === icon ? 'default' : 'outline'}
+                        variant={formData.icon === iconOption.key ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setFormData({ ...formData, icon })}
-                        className="text-lg"
+                        onClick={() => setFormData({ ...formData, icon: iconOption.key })}
+                        className="h-10 px-0"
+                        title={iconOption.label}
                       >
-                        {icon}
+                        <IconGlyph value={iconOption.key} className="h-4 w-4" />
                       </Button>
                     ))}
                   </div>
@@ -251,8 +246,8 @@ export default function Wallets({ accountId, setPage }) {
                       </Button>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">
-                    Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(balanceInput))}</span>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(balanceInput))}</span>
                   </p>
                 </div>
                 <div className="flex flex-col-reverse sm:flex-row gap-2">

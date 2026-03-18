@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Search, Plus, Edit, Trash2, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react'
 import { formatCOP, parseCOP } from '../lib/currency'
 import { accountTransfersService, walletsService } from '../services'
+import { IconGlyph } from '../lib/icons'
+import { TransactionsSkeleton } from './RouteSkeletons'
 
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
 
@@ -237,28 +239,28 @@ export default function Transactions({ accountId, setPage }) {
   const getTransactionIcon = (type) => {
     switch (type) {
       case 'transfer': return <ArrowRightLeft className="w-5 h-5" />
-      case 'income': return <TrendingUp className="w-5 h-5 text-green-600" />
-      case 'expense': return <TrendingDown className="w-5 h-5 text-red-600" />
+      case 'income': return <TrendingUp className="w-5 h-5 text-primary" />
+      case 'expense': return <TrendingDown className="w-5 h-5 text-destructive" />
       default: return <ArrowRightLeft className="w-5 h-5" />
     }
   }
 
   const getTransactionColor = (type) => {
     switch (type) {
-      case 'income': return 'text-green-600'
-      case 'expense': return 'text-red-600'
-      default: return 'text-blue-600'
+      case 'income': return 'text-primary'
+      case 'expense': return 'text-destructive'
+      default: return 'text-primary'
     }
   }
 
-  if (loading) return <div className="flex justify-center items-center h-64">Cargando...</div>
-  if (error) return <div className="text-red-500">Error: {error.message}</div>
+  if (loading) return <TransactionsSkeleton />
+  if (error) return <div className="text-destructive">Error: {error.message}</div>
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold">Transacciones</h1>
-        <Button onClick={openCreateForm} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+        <Button onClick={openCreateForm} className="w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Nueva Transacción
         </Button>
@@ -266,7 +268,7 @@ export default function Transactions({ accountId, setPage }) {
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             type="text"
             placeholder="Buscar transacciones..."
@@ -291,10 +293,10 @@ export default function Transactions({ accountId, setPage }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="border-dashed border-2 border-gray-300 hover:border-blue-400 transition-colors cursor-pointer" onClick={openCreateForm}>
+        <Card className="border-dashed border-2 border-border hover:border-primary/40 transition-colors cursor-pointer" onClick={openCreateForm}>
           <CardContent className="flex flex-col items-center justify-center h-48">
-            <Plus className="w-12 h-12 text-gray-400 mb-2" />
-            <p className="text-gray-500">Crear nueva transacción</p>
+            <Plus className="w-12 h-12 text-muted-foreground mb-2" />
+            <p className="text-muted-foreground">Crear nueva transacción</p>
           </CardContent>
         </Card>
 
@@ -307,7 +309,7 @@ export default function Transactions({ accountId, setPage }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-2">
+              <p className="text-sm text-muted-foreground mb-2">
                 {transaction.type === 'transfer' 
                   ? `De ${getWalletName(transaction.from_wallet)} a ${getWalletName(transaction.to_wallet)}`
                   : `Wallet: ${getWalletName(transaction.from_wallet || transaction.to_wallet)}`
@@ -316,7 +318,7 @@ export default function Transactions({ accountId, setPage }) {
               <p className={`text-2xl font-bold mb-2 ${getTransactionColor(transaction.type)}`}>
                 {formatCOP(transaction.amount)}
               </p>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 {new Date(transaction.created_at).toLocaleDateString()}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -343,7 +345,7 @@ export default function Transactions({ accountId, setPage }) {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>{editing ? 'Editar Transacción' : 'Nueva Transacción'}</CardTitle>
@@ -351,13 +353,13 @@ export default function Transactions({ accountId, setPage }) {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {formError && (
-                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {formError}
                   </div>
                 )}
 
                 {isSharedContext && personalSourceWallets.length > 0 && (
-                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                  <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
                     Puedes usar wallets personales como origen para aportar a esta cuenta compartida.
                   </div>
                 )}
@@ -369,7 +371,10 @@ export default function Transactions({ accountId, setPage }) {
                   <SelectContent>
                     {originWalletOptions.map(wallet => (
                       <SelectItem key={wallet.id} value={wallet.id}>
-                        {wallet.icon} {wallet.name}
+                        <div className="flex items-center gap-2">
+                          <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
+                          <span>{wallet.name}</span>
+                        </div>
                         {wallet.source_type === 'personal' ? ` (Personal: ${wallet.account_name})` : ''}
                       </SelectItem>
                     ))}
@@ -382,7 +387,10 @@ export default function Transactions({ accountId, setPage }) {
                   <SelectContent>
                     {destinationWalletOptions.map(wallet => (
                       <SelectItem key={wallet.id} value={wallet.id}>
-                        {wallet.icon} {wallet.name}
+                        <div className="flex items-center gap-2">
+                          <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
+                          <span>{wallet.name}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -437,8 +445,8 @@ export default function Transactions({ accountId, setPage }) {
                     </Button>
                   ))}
                 </div>
-                <p className="text-xs text-slate-500">
-                  Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(amountInput))}</span>
+                <p className="text-xs text-muted-foreground">
+                  Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(amountInput))}</span>
                 </p>
                 <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                   <SelectTrigger>
@@ -465,27 +473,27 @@ export default function Transactions({ accountId, setPage }) {
       )}
 
       {viewingTransaction && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Detalle de transferencia</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <p className="text-xs text-gray-500">Origen</p>
-                <p className="text-sm font-medium text-gray-900">{getWalletName(viewingTransaction.from_wallet)}</p>
+                <p className="text-xs text-muted-foreground">Origen</p>
+                <p className="text-sm font-medium text-foreground">{getWalletName(viewingTransaction.from_wallet)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Destino</p>
-                <p className="text-sm font-medium text-gray-900">{getWalletName(viewingTransaction.to_wallet)}</p>
+                <p className="text-xs text-muted-foreground">Destino</p>
+                <p className="text-sm font-medium text-foreground">{getWalletName(viewingTransaction.to_wallet)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Monto</p>
-                <p className="text-lg font-bold text-blue-700">{formatCOP(viewingTransaction.amount)}</p>
+                <p className="text-xs text-muted-foreground">Monto</p>
+                <p className="text-lg font-bold text-primary">{formatCOP(viewingTransaction.amount)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Fecha</p>
-                <p className="text-sm text-gray-900">{new Date(viewingTransaction.created_at).toLocaleString('es-CO')}</p>
+                <p className="text-xs text-muted-foreground">Fecha</p>
+                <p className="text-sm text-foreground">{new Date(viewingTransaction.created_at).toLocaleString('es-CO')}</p>
               </div>
               <div className="pt-2 flex justify-end">
                 <Button type="button" variant="outline" onClick={closeViewTransaction}>

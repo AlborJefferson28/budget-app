@@ -10,13 +10,8 @@ import { ProgressBar } from './ui/ProgressBar';
 import { Input } from './ui/Input';
 import { formatCOP, parseCOP } from '../lib/currency';
 import { Trash2 } from 'lucide-react';
-
-const ICONS = {
-  plane: "✈️", laptop: "💻", book: "📚", home: "🏠", food: "🍽️",
-  car: "🚗", health: "💊", savings: "🐷", salary: "💼", emergency: "🛡️",
-  shopping: "🛍️", fun: "🎮", wallet: "👛", chart: "📊", gift: "🎁",
-  music: "🎵", sport: "⚽", pet: "🐾", baby: "🍼", travel: "🌍",
-};
+import { BUDGET_ICON_OPTIONS, IconGlyph, normalizeIconKey } from '../lib/icons';
+import { BudgetsSkeleton } from './RouteSkeletons';
 
 const TABS = [
   { key: 'active', label: 'Metas activas' },
@@ -37,16 +32,17 @@ function IconPicker({ value, onChange }) {
     <div className="mb-4">
       <label className="block text-sm font-medium mb-2">Ícono</label>
       <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
-        {Object.entries(ICONS).map(([k, v]) => (
+        {BUDGET_ICON_OPTIONS.map((option) => (
           <button
-            key={k}
+            key={option.key}
             type="button"
-            onClick={() => onChange(k)}
-            className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center text-2xl transition-all hover:scale-105 ${
-              value === k ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+            onClick={() => onChange(option.key)}
+            className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center transition-all hover:scale-105 ${
+              value === option.key ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:border-primary/40'
             }`}
+            title={option.label}
           >
-            {v}
+            <IconGlyph value={option.key} className="h-5 w-5" />
           </button>
         ))}
       </div>
@@ -60,24 +56,24 @@ export default function Budgets({ accountId, setPage }) {
   const { budgets, loading: budgetsLoading, error: budgetsError, createBudget, updateBudget, deleteBudget } = useBudgets(accountId);
   const { allocations, loading: allocationsLoading } = useAllocations(accountId);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', target: 0, icon: 'savings' });
+  const [formData, setFormData] = useState({ name: '', target: 0, icon: 'piggy-bank' });
   const [targetInput, setTargetInput] = useState('0');
   const [editing, setEditing] = useState(null);
   const [activeTab, setActiveTab] = useState('active');
 
   const openCreateForm = () => {
     setEditing(null);
-    setFormData({ name: '', target: 0, icon: 'savings' });
+    setFormData({ name: '', target: 0, icon: 'piggy-bank' });
     setTargetInput('0');
     setShowForm(true);
   };
 
   // Simulación de estados para demo visual
   const getBudgetStatus = (budget) => {
-    if (budget.progress >= 1) return { label: 'Meta lograda', color: 'bg-gray-400', text: 'text-gray-400' };
-    if (budget.progress >= 0.85) return { label: 'Casi lista', color: 'bg-green-500', text: 'text-green-600' };
-    if (budget.progress < 0.3) return { label: 'En curso', color: 'bg-orange-400', text: 'text-orange-500' };
-    return { label: 'Activo', color: 'bg-blue-600', text: 'text-blue-600' };
+    if (budget.progress >= 1) return { label: 'Meta lograda', color: 'bg-primary', text: 'text-primary' };
+    if (budget.progress >= 0.85) return { label: 'Casi lista', color: 'bg-primary', text: 'text-primary' };
+    if (budget.progress < 0.3) return { label: 'En curso', color: 'bg-secondary', text: 'text-muted-foreground' };
+    return { label: 'Activo', color: 'bg-primary', text: 'text-primary' };
   };
 
   const handleSubmit = async (e) => {
@@ -85,7 +81,7 @@ export default function Budgets({ accountId, setPage }) {
     const dataToSubmit = {
       ...formData,
       target: normalizeCOPAmount(targetInput),
-      icon: ICONS[formData.icon] || '💰'
+      icon: normalizeIconKey(formData.icon, 'piggy-bank')
     };
     if (editing) {
       await updateBudget(editing.id, dataToSubmit);
@@ -93,7 +89,7 @@ export default function Budgets({ accountId, setPage }) {
     } else {
       await createBudget(dataToSubmit);
     }
-    setFormData({ name: '', target: 0, icon: 'savings' });
+    setFormData({ name: '', target: 0, icon: 'piggy-bank' });
     setTargetInput('0');
     setShowForm(false);
   };
@@ -105,7 +101,7 @@ export default function Budgets({ accountId, setPage }) {
 
   const handleEdit = (budget) => {
     setEditing(budget);
-    const iconKey = Object.keys(ICONS).find(key => ICONS[key] === budget.icon) || 'savings';
+    const iconKey = normalizeIconKey(budget.icon, 'piggy-bank');
     setFormData({ name: budget.name, target: budget.target, icon: iconKey });
     setTargetInput(String(normalizeCOPAmount(budget.target)));
     setShowForm(true);
@@ -117,7 +113,7 @@ export default function Budgets({ accountId, setPage }) {
       if (closeModal) {
         setShowForm(false);
         setEditing(null);
-        setFormData({ name: '', target: 0, icon: 'savings' });
+        setFormData({ name: '', target: 0, icon: 'piggy-bank' });
         setTargetInput('0');
       }
     }
@@ -161,8 +157,8 @@ export default function Budgets({ accountId, setPage }) {
     archived: 'No hay presupuestos archivados.',
   };
 
-  if (budgetsLoading || allocationsLoading) return <div className="p-8">Cargando...</div>;
-  if (budgetsError) return <div className="p-8 text-red-500">Error: {budgetsError.message}</div>;
+  if (budgetsLoading || allocationsLoading) return <BudgetsSkeleton />;
+  if (budgetsError) return <div className="p-8 text-destructive">Error: {budgetsError.message}</div>;
 
   return (
     <div className="p-4 sm:p-6">
@@ -181,11 +177,11 @@ export default function Budgets({ accountId, setPage }) {
         {TABS.map(tab => (
           <button
             key={tab.key}
-            className={`pb-3 px-1 text-base font-medium border-b-2 transition-colors shrink-0 ${activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-600'}`}
+            className={`pb-3 px-1 text-base font-medium border-b-2 transition-colors shrink-0 ${activeTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}
             onClick={() => setActiveTab(tab.key)}
           >
             {tab.label}
-            <span className="ml-1 text-xs bg-blue-100 text-blue-600 rounded px-2">{(budgetsByTab[tab.key] || []).length}</span>
+            <span className="ml-1 text-xs bg-primary/10 text-primary rounded px-2">{(budgetsByTab[tab.key] || []).length}</span>
           </button>
         ))}
       </div>
@@ -197,9 +193,11 @@ export default function Budgets({ accountId, setPage }) {
           return (
             <Card key={budget.id || idx} className="relative group">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <span className="text-3xl">{budget.icon || '💰'}</span>
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconGlyph value={budget.icon} fallback="piggy-bank" className="h-5 w-5" />
+                </span>
                 {status.label && (
-                  <span className={`text-xs font-semibold px-2 py-1 rounded ${status.text} bg-gray-100`}>{status.label}</span>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded bg-muted ${status.text}`}>{status.label}</span>
                 )}
               </CardHeader>
               <CardContent className="pt-0">
@@ -220,7 +218,7 @@ export default function Budgets({ accountId, setPage }) {
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => handleEdit(budget)}>Editar</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDelete(budget.id)} className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
+                    <Button size="sm" variant="outline" onClick={() => handleDelete(budget.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive">
                       Eliminar
                     </Button>
                   </div>
@@ -230,7 +228,7 @@ export default function Budgets({ accountId, setPage }) {
           );
         })}
         {shouldShowCreateCard && (
-          <Card className="flex flex-col items-center justify-center border-dashed border-2 min-h-[200px] cursor-pointer hover:bg-gray-50 transition" onClick={openCreateForm}>
+          <Card className="flex flex-col items-center justify-center border-dashed border-2 border-border min-h-[200px] cursor-pointer hover:bg-muted/40 transition" onClick={openCreateForm}>
             <div className="flex flex-col items-center">
               <span className="text-3xl mb-2">+</span>
               <span className="font-semibold">Agregar nuevo presupuesto</span>
@@ -247,7 +245,7 @@ export default function Budgets({ accountId, setPage }) {
       {/* Modal/Formulario */}
       {showForm && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h3>
             <div className="mb-4">
               <label className="block text-sm mb-1">Nombre</label>
@@ -312,8 +310,8 @@ export default function Budgets({ accountId, setPage }) {
                   </Button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Vista previa: <span className="font-semibold text-slate-700">{formatCOP(normalizeCOPAmount(targetInput))}</span>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(targetInput))}</span>
               </p>
             </div>
             <IconPicker
@@ -325,7 +323,7 @@ export default function Budgets({ accountId, setPage }) {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full sm:w-auto mr-auto border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="w-full sm:w-auto mr-auto border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => handleDelete(editing.id, true)}
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
@@ -333,7 +331,7 @@ export default function Budgets({ accountId, setPage }) {
                 </Button>
               )}
               <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'savings' }); setTargetInput('0'); }}>Cancelar</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'piggy-bank' }); setTargetInput('0'); }}>Cancelar</Button>
             </div>
           </form>
         </div>

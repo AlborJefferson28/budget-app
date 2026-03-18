@@ -7,6 +7,8 @@ import { useAllocations } from '../hooks/useAllocations'
 import { accountTransfersService } from '../services'
 import { Wallet, TrendingUp, Plus, ArrowRight, DollarSign, Target, Activity, Lightbulb } from 'lucide-react'
 import { formatCOP } from '../lib/currency'
+import { IconGlyph } from '../lib/icons'
+import { DashboardSkeleton } from './RouteSkeletons'
 
 export default function Dashboard({ setPage, setSelectedAccount, accountId: selectedAccountId }) {
   const { accounts, loading: accountsLoading, error: accountsError } = useAccounts()
@@ -56,17 +58,10 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
   }, [wallets])
 
   if (accountsLoading || walletsLoading || budgetsLoading || transactionsLoading || allocationsLoading || transfersLoading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando dashboard...</p>
-        </div>
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
-  if (accountsError) return <div className="min-h-[60vh] flex items-center justify-center text-red-600">Error: {accountsError.message}</div>
+  if (accountsError) return <div className="min-h-[60vh] flex items-center justify-center text-destructive">Error: {accountsError.message}</div>
 
   // Calcular total balance
   const totalBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0)
@@ -113,7 +108,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
         ? `De ${getWalletName(transaction.from_wallet)} a ${getWalletName(transaction.to_wallet)}`
         : `Wallet: ${getWalletName(transaction.from_wallet || transaction.to_wallet)}`,
       amount: transaction.amount,
-      amountStyle: transaction.type === 'expense' ? 'text-red-600' : 'text-green-600',
+      amountStyle: transaction.type === 'expense' ? 'text-destructive' : 'text-primary',
       amountPrefix: transaction.type === 'expense' ? '-' : '+',
     }
   })
@@ -127,7 +122,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
       title: 'Aporte entre cuentas',
       subtitle: `${shortId(transfer.from_wallet_id)} -> ${shortId(transfer.to_wallet_id)}`,
       amount: transfer.amount,
-      amountStyle: isIncoming ? 'text-green-600' : 'text-red-600',
+      amountStyle: isIncoming ? 'text-primary' : 'text-destructive',
       amountPrefix: isIncoming ? '+' : '-',
     }
   })
@@ -139,7 +134,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
     title: 'Asignación a presupuesto',
     subtitle: `${allocation.wallets?.name || shortId(allocation.wallet_id)} -> ${allocation.budgets?.name || shortId(allocation.budget_id)}`,
     amount: allocation.amount,
-    amountStyle: 'text-blue-600',
+    amountStyle: 'text-primary',
     amountPrefix: '-',
   }))
 
@@ -150,22 +145,22 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="bg-white shadow-sm px-4 py-5 sm:px-6">
+      <div className="bg-card border border-border rounded-xl px-4 py-5 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 lg:text-2xl">Budget App</h1>
-              <p className="text-sm text-gray-600">Dashboard Financiero</p>
+              <h1 className="text-xl font-bold text-foreground lg:text-2xl">Budget App</h1>
+              <p className="text-sm text-muted-foreground">Dashboard Financiero</p>
             </div>
           </div>
           <button
             onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('transactions') } }}
-            className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2.5 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
+            className="w-full sm:w-auto bg-primary text-primary-foreground px-4 py-2.5 rounded-lg flex items-center justify-center space-x-2 hover:bg-primary/90 transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Nueva Transacción</span>
@@ -178,38 +173,38 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
         <div className="lg:col-span-2 space-y-6">
           {/* Tarjetas de resumen */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-6 rounded-xl shadow-sm">
+            <div className="bg-card border border-border p-6 rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Balance total</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCOP(totalBalance)}</p>
+                  <p className="text-sm text-muted-foreground">Balance total</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCOP(totalBalance)}</p>
                 </div>
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-green-600" />
+                <div className="w-12 h-12 bg-primary/15 rounded-full flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-primary" />
                 </div>
               </div>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm">
+            <div className="bg-card border border-border p-6 rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Gasto mensual</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCOP(monthlySpending)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Incluye gastos y asignaciones a presupuestos</p>
+                  <p className="text-sm text-muted-foreground">Gasto mensual</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCOP(monthlySpending)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Incluye gastos y asignaciones a presupuestos</p>
                 </div>
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 bg-destructive/15 rounded-full flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-destructive" />
                 </div>
               </div>
             </div>
           </div>
 
           {/* Wallets */}
-          <div className="bg-white p-6 rounded-xl shadow-sm">
+          <div className="bg-card border border-border p-6 rounded-xl">
             <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Billeteras</h2>
+              <h2 className="text-lg font-semibold text-foreground">Billeteras</h2>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('wallets') } }}
-                className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700 shrink-0"
+                className="text-primary text-sm flex items-center space-x-1 hover:text-primary/80 shrink-0"
               >
                 <span>Ver todas</span>
                 <ArrowRight className="w-4 h-4" />
@@ -217,27 +212,29 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
             </div>
             <div className="max-h-[300px] overflow-y-auto pr-1 space-y-3">
               {wallets.length > 0 ? wallets.slice(0, 12).map(wallet => (
-                <div key={wallet.id} className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg">
+                <div key={wallet.id} className="flex items-center justify-between gap-3 p-3 bg-muted/60 rounded-lg border border-border/60">
                   <div className="flex items-center space-x-3">
-                    <span className="text-2xl">{wallet.icon}</span>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <IconGlyph value={wallet.icon} fallback="wallet" className="h-5 w-5" />
+                    </span>
                     <div>
-                      <p className="font-medium text-gray-900">{wallet.name}</p>
-                      <p className="text-sm text-gray-600">{formatCOP(wallet.balance)}</p>
+                      <p className="font-medium text-foreground">{wallet.name}</p>
+                      <p className="text-sm text-muted-foreground">{formatCOP(wallet.balance)}</p>
                     </div>
                   </div>
-                  <Wallet className="w-5 h-5 text-gray-400" />
+                  <Wallet className="w-5 h-5 text-muted-foreground" />
                 </div>
-              )) : <p className="text-gray-500 text-center py-4">No tienes billeteras aún. Crea una nueva.</p>}
+              )) : <p className="text-muted-foreground text-center py-4">No tienes billeteras aún. Crea una nueva.</p>}
             </div>
           </div>
 
           {/* Actividad Reciente */}
-          <div className="bg-white p-6 rounded-xl shadow-sm">
+          <div className="bg-card border border-border p-6 rounded-xl">
             <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Actividad Reciente</h2>
+              <h2 className="text-lg font-semibold text-foreground">Actividad Reciente</h2>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('transactions') } }}
-                className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700 shrink-0"
+                className="text-primary text-sm flex items-center space-x-1 hover:text-primary/80 shrink-0"
               >
                 <span>Ver todas</span>
                 <ArrowRight className="w-4 h-4" />
@@ -246,43 +243,43 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
             {/* Mobile: lista */}
             <div className="lg:hidden max-h-[360px] overflow-y-auto pr-1 space-y-3">
               {recentActivity.length > 0 ? recentActivity.map(event => (
-                <div key={event.id} className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg">
+                <div key={event.id} className="flex items-center justify-between gap-2 p-3 bg-muted/60 rounded-lg border border-border/60">
                   <div className="flex items-center space-x-3">
-                    <Activity className="w-5 h-5 text-gray-400" />
+                    <Activity className="w-5 h-5 text-muted-foreground" />
                     <div>
-                      <p className="font-medium text-gray-900">{event.title}</p>
-                      <p className="text-sm text-gray-600">{event.subtitle}</p>
-                      <p className="text-xs text-gray-500">{new Date(event.date).toLocaleDateString()}</p>
+                      <p className="font-medium text-foreground">{event.title}</p>
+                      <p className="text-sm text-muted-foreground">{event.subtitle}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(event.date).toLocaleDateString()}</p>
                     </div>
                   </div>
                   <p className={`font-medium ${event.amountStyle}`}>
                     {event.amountPrefix}{formatCOP(event.amount)}
                   </p>
                 </div>
-              )) : <p className="text-gray-500 text-center py-4">No hay actividad reciente.</p>}
+              )) : <p className="text-muted-foreground text-center py-4">No hay actividad reciente.</p>}
             </div>
             {/* Desktop: tabla */}
             <div className="hidden lg:block max-h-[360px] overflow-y-auto pr-1">
               {recentActivity.length > 0 ? (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 font-medium text-gray-700">Tipo</th>
-                      <th className="text-left py-2 font-medium text-gray-700">Fecha</th>
-                      <th className="text-right py-2 font-medium text-gray-700">Monto</th>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 font-medium text-muted-foreground">Tipo</th>
+                      <th className="text-left py-2 font-medium text-muted-foreground">Fecha</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">Monto</th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentActivity.map(event => (
-                      <tr key={event.id} className="border-b">
+                      <tr key={event.id} className="border-b border-border/70">
                         <td className="py-3">
                           <div className="flex items-center space-x-2">
-                            <Activity className="w-4 h-4 text-gray-400" />
+                            <Activity className="w-4 h-4 text-muted-foreground" />
                             <span>{event.title}</span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">{event.subtitle}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{event.subtitle}</p>
                         </td>
-                        <td className="py-3 text-gray-600">{new Date(event.date).toLocaleDateString()}</td>
+                        <td className="py-3 text-muted-foreground">{new Date(event.date).toLocaleDateString()}</td>
                         <td className={`py-3 text-right font-medium ${event.amountStyle}`}>
                           {event.amountPrefix}{formatCOP(event.amount)}
                         </td>
@@ -290,7 +287,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                     ))}
                   </tbody>
                 </table>
-              ) : <p className="text-gray-500 text-center py-4">No hay actividad reciente.</p>}
+              ) : <p className="text-muted-foreground text-center py-4">No hay actividad reciente.</p>}
             </div>
           </div>
         </div>
@@ -298,19 +295,19 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
         {/* Columna derecha */}
         <div className="space-y-6 mt-6 lg:mt-0">
           {/* Quick Actions */}
-          <div className="bg-white p-6 rounded-xl shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Acciones rápidas</h3>
+          <div className="bg-card border border-border p-6 rounded-xl">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Acciones rápidas</h3>
             <div className="space-y-3">
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('wallets') } }}
-                className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
+                className="w-full bg-primary text-primary-foreground px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-primary/90 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nueva billetera</span>
               </button>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('budgets') } }}
-                className="w-full bg-green-600 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-green-700 transition-colors"
+                className="w-full bg-secondary text-secondary-foreground px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-secondary/80 transition-colors border border-border"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nuevo presupuesto</span>
@@ -319,12 +316,12 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
           </div>
 
           {/* Budgets */}
-          <div className="bg-white p-6 rounded-xl shadow-sm">
+          <div className="bg-card border border-border p-6 rounded-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Presupuestos</h3>
+              <h3 className="text-lg font-semibold text-foreground">Presupuestos</h3>
               <button
                 onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('budgets') } }}
-                className="text-blue-600 text-sm flex items-center space-x-1 hover:text-blue-700"
+                className="text-primary text-sm flex items-center space-x-1 hover:text-primary/80"
               >
                 <span>Ver todas</span>
                 <ArrowRight className="w-4 h-4" />
@@ -332,32 +329,34 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
             </div>
             <div className="space-y-3">
               {budgetProgress.length > 0 ? budgetProgress.slice(0, 3).map(budget => (
-                <div key={budget.id} className="p-3 bg-gray-50 rounded-lg">
+                <div key={budget.id} className="p-3 bg-muted/60 rounded-lg border border-border/60">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-3">
-                      <span className="text-2xl">{budget.icon}</span>
-                      <p className="font-medium text-gray-900">{budget.name}</p>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <IconGlyph value={budget.icon} fallback="piggy-bank" className="h-5 w-5" />
+                      </span>
+                      <p className="font-medium text-foreground">{budget.name}</p>
                     </div>
-                    <p className="text-sm text-gray-600">{formatCOP(budget.spent)} / {formatCOP(budget.target)}</p>
+                    <p className="text-sm text-muted-foreground">{formatCOP(budget.spent)} / {formatCOP(budget.target)}</p>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full"
+                      className="bg-primary h-2 rounded-full"
                       style={{ width: `${Math.min(budget.progress, 100)}%` }}
                     ></div>
                   </div>
                 </div>
-              )) : <p className="text-gray-500 text-center py-4">No tienes presupuestos aún. Crea uno nuevo.</p>}
+              )) : <p className="text-muted-foreground text-center py-4">No tienes presupuestos aún. Crea uno nuevo.</p>}
             </div>
           </div>
 
           {/* Tip Financiero */}
-          <div className="bg-blue-50 p-6 rounded-xl">
+          <div className="bg-accent/60 border border-border p-6 rounded-xl">
             <div className="flex items-start space-x-3">
-              <Lightbulb className="w-6 h-6 text-blue-600 mt-1" />
+              <Lightbulb className="w-6 h-6 text-primary mt-1" />
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Tip Financiero</h3>
-                <p className="text-sm text-gray-700">Recuerda revisar tus gastos mensuales para mantener un presupuesto saludable. ¡Sigue ahorrando!</p>
+                <h3 className="font-semibold text-foreground mb-2">Tip Financiero</h3>
+                <p className="text-sm text-muted-foreground">Recuerda revisar tus gastos mensuales para mantener un presupuesto saludable. ¡Sigue ahorrando!</p>
               </div>
             </div>
           </div>
