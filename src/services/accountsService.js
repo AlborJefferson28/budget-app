@@ -18,10 +18,12 @@ export const accountsService = {
 
     if (memberError) return { data: null, error: memberError }
 
-    const memberAccountData = memberAccounts?.map(m => m.accounts) || []
+    const memberAccountData = (memberAccounts || [])
+      .map(member => member?.accounts)
+      .filter(account => account?.id)
 
     // Combine and remove duplicates
-    const allAccounts = [...(owned || []), ...memberAccountData]
+    const allAccounts = [...(owned || []), ...memberAccountData].filter(account => account?.id)
     const uniqueAccounts = allAccounts.filter((acc, index, self) =>
       index === self.findIndex(a => a.id === acc.id)
     )
@@ -33,7 +35,8 @@ export const accountsService = {
     const { data, error } = await supabase
       .from('accounts')
       .insert(account)
-      .select()
+      .select('*')
+      .single()
     return { data, error }
   },
 
@@ -42,7 +45,8 @@ export const accountsService = {
       .from('accounts')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select('*')
+      .single()
     return { data, error }
   },
 
