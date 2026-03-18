@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { accountsService } from '../services'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -14,26 +14,51 @@ const emitAccountsChanged = () => {
 export const useAccounts = () => {
   const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const { user } = useAuth()
+  const hasLoadedOnceRef = useRef(false)
+  const lastUserIdRef = useRef(null)
 
   const fetchAccounts = useCallback(async () => {
-    if (!user?.id) {
+    const currentUserId = user?.id || null
+    const didUserChange = lastUserIdRef.current !== currentUserId
+
+    if (didUserChange) {
+      lastUserIdRef.current = currentUserId
+      hasLoadedOnceRef.current = false
+    }
+
+    if (!currentUserId) {
       setAccounts([])
       setError(null)
       setLoading(false)
+      setRefreshing(false)
       return
     }
 
-    setLoading(true)
-    const { data, error: fetchError } = await accountsService.getAll(user.id)
+    const isInitialLoad = !hasLoadedOnceRef.current
+
+    if (isInitialLoad) {
+      setLoading(true)
+    } else {
+      setRefreshing(true)
+    }
+
+    const { data, error: fetchError } = await accountsService.getAll(currentUserId)
     if (fetchError) {
       setError(fetchError)
     } else {
       setAccounts(sanitizeAccounts(data || []))
       setError(null)
     }
-    setLoading(false)
+
+    if (isInitialLoad) {
+      hasLoadedOnceRef.current = true
+      setLoading(false)
+    } else {
+      setRefreshing(false)
+    }
   }, [user?.id])
 
   useEffect(() => {
@@ -92,6 +117,7 @@ export const useAccounts = () => {
   return {
     accounts,
     loading,
+    refreshing,
     error,
     createAccount,
     updateAccount,
