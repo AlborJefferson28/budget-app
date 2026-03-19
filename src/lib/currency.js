@@ -4,6 +4,10 @@ const COP_FORMATTER = new Intl.NumberFormat('es-CO', {
   maximumFractionDigits: 0,
 })
 
+const COP_INPUT_FORMATTER = new Intl.NumberFormat('es-CO', {
+  maximumFractionDigits: 0,
+})
+
 export const formatCOP = (value) => {
   const numericValue = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(numericValue)) return COP_FORMATTER.format(0)
@@ -30,4 +34,20 @@ export const parseCOP = (value) => {
 
   const parsed = Number.parseFloat(normalized)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+export const normalizeCOPAmount = (value) => {
+  const parsed = parseCOP(value)
+  return Math.max(0, Math.round(parsed))
+}
+
+export const formatCOPInput = (value) => {
+  const normalized = normalizeCOPAmount(value)
+  return COP_INPUT_FORMATTER.format(normalized)
+}
+
+export const formatCOPInputFromRaw = (value) => {
+  const digitsOnly = String(value ?? '').replace(/\D/g, '')
+  if (!digitsOnly) return ''
+  return COP_INPUT_FORMATTER.format(Number(digitsOnly))
 }

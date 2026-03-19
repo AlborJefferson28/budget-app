@@ -10,17 +10,12 @@ import { Input } from './ui/Input'
 import { Select, SelectContent, SelectEmpty, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
 import { Search, Plus, Edit, Trash2, ArrowRightLeft } from 'lucide-react'
 import WalletDetail from './WalletDetail'
-import { formatCOP, parseCOP } from '../lib/currency'
+import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
 import { IconGlyph, WALLET_ICON_OPTIONS, normalizeIconKey } from '../lib/icons'
 import { WalletsSkeleton } from './RouteSkeletons'
 
 const QUICK_BALANCE_STEPS = [10000, 50000, 100000]
 const QUICK_TRANSFER_STEPS = [10000, 50000, 100000]
-
-const normalizeCOPAmount = (value) => {
-  const parsed = parseCOP(value)
-  return Math.max(0, Math.round(parsed))
-}
 
 export default function Wallets({ accountId, setPage, selectedWalletId = null, onClearSelectedWallet }) {
   const { user } = useAuth()
@@ -37,6 +32,7 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferForm, setTransferForm] = useState({ from_wallet: '', to_wallet: '', amount: '0' })
   const [transferAdjustMode, setTransferAdjustMode] = useState('add')
+  const [balanceAdjustMode, setBalanceAdjustMode] = useState('add')
   const [transferSubmitting, setTransferSubmitting] = useState(false)
   const [transferError, setTransferError] = useState('')
 
@@ -85,19 +81,26 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
     setEditing(null)
     setFormData({ name: '', icon: 'wallet', balance: 0 })
     setBalanceInput('0')
+    setBalanceAdjustMode('add')
     setShowForm(true)
   }
 
   const resetForm = () => {
     setFormData({ name: '', icon: 'wallet', balance: 0 })
     setBalanceInput('0')
+    setBalanceAdjustMode('add')
     setEditing(null)
     setShowForm(false)
   }
 
   const applyBalanceQuickAmount = (delta) => {
     const nextValue = Math.max(0, normalizeCOPAmount(balanceInput) + delta)
-    setBalanceInput(String(nextValue))
+    setBalanceInput(formatCOPInput(nextValue))
+  }
+
+  const applyBalanceStepByMode = (step) => {
+    const sign = balanceAdjustMode === 'add' ? 1 : -1
+    applyBalanceQuickAmount(step * sign)
   }
 
   const handleSubmit = async (e) => {
@@ -121,7 +124,8 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
   const handleEdit = (wallet) => {
     setEditing(wallet)
     setFormData({ name: wallet.name, icon: normalizeIconKey(wallet.icon, 'wallet'), balance: wallet.balance })
-    setBalanceInput(String(normalizeCOPAmount(wallet.balance)))
+    setBalanceInput(formatCOPInput(wallet.balance))
+    setBalanceAdjustMode('add')
     setShowForm(true)
   }
 
@@ -166,7 +170,7 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
 
   const applyTransferQuickAmount = (delta) => {
     const nextValue = Math.max(0, normalizeCOPAmount(transferForm.amount) + delta)
-    setTransferForm(prev => ({ ...prev, amount: String(nextValue) }))
+    setTransferForm(prev => ({ ...prev, amount: formatCOPInput(nextValue) }))
   }
 
   const applyTransferStepByMode = (step) => {
@@ -475,21 +479,10 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
                       }
                     }}
                     onChange={(e) => {
-                      const nextValue = e.target.value
-                      if (nextValue === '') {
-                        setTransferForm(prev => ({ ...prev, amount: '' }))
-                        return
-                      }
-                      if (/^[\d.,\s]+$/.test(nextValue)) {
-                        setTransferForm(prev => ({ ...prev, amount: nextValue }))
-                      }
+                      setTransferForm(prev => ({ ...prev, amount: formatCOPInputFromRaw(e.target.value) }))
                     }}
                     onBlur={() => {
-                      if (!transferForm.amount) {
-                        setTransferForm(prev => ({ ...prev, amount: '0' }))
-                        return
-                      }
-                      setTransferForm(prev => ({ ...prev, amount: String(normalizeCOPAmount(prev.amount)) }))
+                      setTransferForm(prev => ({ ...prev, amount: formatCOPInput(prev.amount) }))
                     }}
                     required
                   />
@@ -534,9 +527,6 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
                       ))}
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Vista previa: <span className="font-semibold text-foreground">{formatCOP(previewTransferAmount)}</span>
-                  </p>
                   {selectedSourceWallet && previewTransferAmount > normalizeCOPAmount(selectedSourceWallet.balance) && (
                     <p className="mt-1 text-xs text-destructive">
                       Saldo insuficiente en origen. Disponible: {formatCOP(selectedSourceWallet.balance)}.
@@ -606,50 +596,53 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
                       if (balanceInput === '0') setBalanceInput('')
                     }}
                     onChange={(e) => {
-                      const nextValue = e.target.value
-                      if (nextValue === '') {
-                        setBalanceInput('')
-                        return
-                      }
-                      if (/^[\d.,\s]+$/.test(nextValue)) {
-                        setBalanceInput(nextValue)
-                      }
+                      setBalanceInput(formatCOPInputFromRaw(e.target.value))
                     }}
                     onBlur={() => {
-                      if (!balanceInput) {
-                        setBalanceInput('0')
-                        return
-                      }
-                      setBalanceInput(String(normalizeCOPAmount(balanceInput)))
+                      setBalanceInput(formatCOPInput(balanceInput))
                     }}
                   />
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {QUICK_BALANCE_STEPS.map((quickAmount) => (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                    <div className="grid grid-cols-2 gap-2">
                       <Button
-                        key={`add-${quickAmount}`}
                         type="button"
-                        variant="outline"
+                        variant={balanceAdjustMode === 'add' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => applyBalanceQuickAmount(quickAmount)}
+                        className={balanceAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                        onClick={() => setBalanceAdjustMode('add')}
                       >
-                        + {formatCOP(quickAmount)}
+                        Sumar
                       </Button>
-                    ))}
-                    {QUICK_BALANCE_STEPS.map((quickAmount) => (
                       <Button
-                        key={`sub-${quickAmount}`}
                         type="button"
-                        variant="outline"
+                        variant={balanceAdjustMode === 'subtract' ? 'destructive' : 'outline'}
                         size="sm"
-                        onClick={() => applyBalanceQuickAmount(-quickAmount)}
+                        className={balanceAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                        onClick={() => setBalanceAdjustMode('subtract')}
                       >
-                        - {formatCOP(quickAmount)}
+                        Restar
                       </Button>
-                    ))}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {QUICK_BALANCE_STEPS.map((quickAmount) => (
+                        <Button
+                          key={`wallet-balance-step-${quickAmount}`}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={`justify-start ${
+                            balanceAdjustMode === 'add'
+                              ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                              : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                          }`}
+                          onClick={() => applyBalanceStepByMode(quickAmount)}
+                        >
+                          {balanceAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(balanceInput))}</span>
-                  </p>
                 </div>
                 <div className="flex flex-col-reverse sm:flex-row gap-2">
                   <Button type="submit" className="w-full sm:w-auto">

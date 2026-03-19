@@ -8,17 +8,12 @@ import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select, SelectContent, SelectEmpty, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
 import { Search, Plus, Edit, Trash2, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react'
-import { formatCOP, parseCOP } from '../lib/currency'
+import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
 import { accountTransfersService, walletsService } from '../services'
 import { IconGlyph } from '../lib/icons'
 import { TransactionsSkeleton } from './RouteSkeletons'
 
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
-
-const normalizeCOPAmount = (value) => {
-  const parsed = parseCOP(value)
-  return Math.max(0, Math.round(parsed))
-}
 
 const getErrorMessage = (error, fallback) => {
   if (!error) return fallback
@@ -40,6 +35,7 @@ export default function Transactions({ accountId, setPage }) {
   const [sourceLoading, setSourceLoading] = useState(false)
   const [formError, setFormError] = useState('')
   const [viewingTransaction, setViewingTransaction] = useState(null)
+  const [amountAdjustMode, setAmountAdjustMode] = useState('add')
 
   const activeAccount = useMemo(
     () => accounts.find(account => account.id === accountId) || null,
@@ -151,6 +147,7 @@ export default function Transactions({ accountId, setPage }) {
     setEditing(null)
     setFormError('')
     setAmountInput('0')
+    setAmountAdjustMode('add')
     setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' })
   }
 
@@ -158,13 +155,19 @@ export default function Transactions({ accountId, setPage }) {
     setEditing(null)
     setFormError('')
     setAmountInput('0')
+    setAmountAdjustMode('add')
     setFormData({ from_wallet: '', to_wallet: '', amount: 0, type: 'transfer' })
     setShowForm(true)
   }
 
   const applyAmountQuickDelta = (delta) => {
     const nextValue = Math.max(0, normalizeCOPAmount(amountInput) + delta)
-    setAmountInput(String(nextValue))
+    setAmountInput(formatCOPInput(nextValue))
+  }
+
+  const applyAmountStepByMode = (step) => {
+    const sign = amountAdjustMode === 'add' ? 1 : -1
+    applyAmountQuickDelta(step * sign)
   }
 
   const handleSubmit = async (e) => {
@@ -256,7 +259,8 @@ export default function Transactions({ accountId, setPage }) {
       amount: transaction.amount,
       type: transaction.type
     })
-    setAmountInput(String(normalizeCOPAmount(transaction.amount)))
+    setAmountInput(formatCOPInput(transaction.amount))
+    setAmountAdjustMode('add')
     setShowForm(true)
   }
 
@@ -476,51 +480,54 @@ export default function Transactions({ accountId, setPage }) {
                     if (amountInput === '0') setAmountInput('')
                   }}
                   onChange={(e) => {
-                    const nextValue = e.target.value
-                    if (nextValue === '') {
-                      setAmountInput('')
-                      return
-                    }
-                    if (/^[\d.,\s]+$/.test(nextValue)) {
-                      setAmountInput(nextValue)
-                    }
+                    setAmountInput(formatCOPInputFromRaw(e.target.value))
                   }}
                   onBlur={() => {
-                    if (!amountInput) {
-                      setAmountInput('0')
-                      return
-                    }
-                    setAmountInput(String(normalizeCOPAmount(amountInput)))
+                    setAmountInput(formatCOPInput(amountInput))
                   }}
                   required
                 />
-                <div className="flex flex-wrap gap-2">
-                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
-                      key={`tx-add-${quickAmount}`}
                       type="button"
-                      variant="outline"
+                      variant={amountAdjustMode === 'add' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => applyAmountQuickDelta(quickAmount)}
+                      className={amountAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                      onClick={() => setAmountAdjustMode('add')}
                     >
-                      + {formatCOP(quickAmount)}
+                      Sumar
                     </Button>
-                  ))}
-                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
                     <Button
-                      key={`tx-sub-${quickAmount}`}
                       type="button"
-                      variant="outline"
+                      variant={amountAdjustMode === 'subtract' ? 'destructive' : 'outline'}
                       size="sm"
-                      onClick={() => applyAmountQuickDelta(-quickAmount)}
+                      className={amountAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                      onClick={() => setAmountAdjustMode('subtract')}
                     >
-                      - {formatCOP(quickAmount)}
+                      Restar
                     </Button>
-                  ))}
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                      <Button
+                        key={`tx-step-${quickAmount}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={`justify-start ${
+                          amountAdjustMode === 'add'
+                            ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                            : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                        }`}
+                        onClick={() => applyAmountStepByMode(quickAmount)}
+                      >
+                        {amountAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(amountInput))}</span>
-                </p>
                 {formData.type !== 'income' && previewAvailableBalance !== null && previewTransactionAmount > previewAvailableBalance && (
                   <p className="text-xs text-destructive">
                     Advertencia: saldo insuficiente en billetera origen. Disponible: {formatCOP(previewAvailableBalance)}.

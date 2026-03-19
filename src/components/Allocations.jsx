@@ -9,17 +9,12 @@ import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectEmpty } from './ui/Select';
-import { formatCOP, parseCOP } from '../lib/currency';
+import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency';
 import { accountTransfersService, walletsService } from '../services';
 import { IconGlyph } from '../lib/icons';
 import { AllocationsSkeleton } from './RouteSkeletons';
 
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000];
-
-const normalizeCOPAmount = (value) => {
-  const parsed = parseCOP(value);
-  return Math.max(0, Math.round(parsed));
-};
 
 const getErrorMessage = (error, fallback) => {
   if (!error) return fallback;
@@ -63,6 +58,7 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
   const [fundingLoading, setFundingLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [viewingAllocation, setViewingAllocation] = useState(null);
+  const [amountAdjustMode, setAmountAdjustMode] = useState('add');
   const pageSize = 4;
 
   const activeAccount = useMemo(
@@ -310,12 +306,18 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
 
     setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
     setAmountInput('0');
+    setAmountAdjustMode('add');
     setShowForm(false);
   };
 
   const applyAmountQuickDelta = (delta) => {
     const nextValue = Math.max(0, normalizeCOPAmount(amountInput) + delta);
-    setAmountInput(String(nextValue));
+    setAmountInput(formatCOPInput(nextValue));
+  };
+
+  const applyAmountStepByMode = (step) => {
+    const sign = amountAdjustMode === 'add' ? 1 : -1;
+    applyAmountQuickDelta(step * sign);
   };
 
   const handleViewAllocation = (allocation) => {
@@ -350,6 +352,7 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
   const openCreateForm = () => {
     setFormError('');
     setAmountInput('0');
+    setAmountAdjustMode('add');
     setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
     setShowForm(true);
   };
@@ -660,52 +663,55 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                   if (amountInput === '0') setAmountInput('');
                 }}
                 onChange={e => {
-                  const nextValue = e.target.value;
-                  if (nextValue === '') {
-                    setAmountInput('');
-                    return;
-                  }
-                  if (/^[\d.,\s]+$/.test(nextValue)) {
-                    setAmountInput(nextValue);
-                  }
+                  setAmountInput(formatCOPInputFromRaw(e.target.value));
                 }}
                 onBlur={() => {
-                  if (!amountInput) {
-                    setAmountInput('0');
-                    return;
-                  }
-                  setAmountInput(String(normalizeCOPAmount(amountInput)));
+                  setAmountInput(formatCOPInput(amountInput));
                 }}
                 required
                 min={1}
               />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                <div className="grid grid-cols-2 gap-2">
                   <Button
-                    key={`alloc-add-${quickAmount}`}
                     type="button"
-                    variant="outline"
+                    variant={amountAdjustMode === 'add' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => applyAmountQuickDelta(quickAmount)}
+                    className={amountAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                    onClick={() => setAmountAdjustMode('add')}
                   >
-                    + {formatCOP(quickAmount)}
+                    Sumar
                   </Button>
-                ))}
-                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
                   <Button
-                    key={`alloc-sub-${quickAmount}`}
                     type="button"
-                    variant="outline"
+                    variant={amountAdjustMode === 'subtract' ? 'destructive' : 'outline'}
                     size="sm"
-                    onClick={() => applyAmountQuickDelta(-quickAmount)}
+                    className={amountAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                    onClick={() => setAmountAdjustMode('subtract')}
                   >
-                    - {formatCOP(quickAmount)}
+                    Restar
                   </Button>
-                ))}
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                    <Button
+                      key={`alloc-step-${quickAmount}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={`justify-start ${
+                        amountAdjustMode === 'add'
+                          ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                          : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                      }`}
+                      onClick={() => applyAmountStepByMode(quickAmount)}
+                    >
+                      {amountAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                    </Button>
+                  ))}
+                </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(amountInput))}</span>
-              </p>
               {selectedBudgetRemaining !== null && previewAllocationAmount > selectedBudgetRemaining && (
                 <p className="mt-1 text-xs text-destructive">
                   Advertencia: excede lo permitido por el presupuesto. Máximo disponible: {formatCOP(selectedBudgetRemaining)}.
@@ -724,7 +730,7 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
               <Button type="submit" className="w-full sm:w-auto" disabled={fundingLoading}>Crear</Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setFormError(''); setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' }); setAmountInput('0'); }}>Cancelar</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setFormError(''); setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' }); setAmountInput('0'); setAmountAdjustMode('add'); }}>Cancelar</Button>
             </div>
           </form>
         </div>

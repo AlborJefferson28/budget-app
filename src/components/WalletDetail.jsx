@@ -8,15 +8,10 @@ import { Input } from './ui/Input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
 import { Skeleton } from './ui/Skeleton'
 import { ArrowLeft, ArrowRightLeft, Check, Download, Edit, Eye, PiggyBank, TrendingDown, TrendingUp, Trash2, X } from 'lucide-react'
-import { formatCOP, parseCOP } from '../lib/currency'
+import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
 import { IconGlyph, WALLET_ICON_OPTIONS, normalizeIconKey } from '../lib/icons'
 
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
-
-const normalizeCOPAmount = (value) => {
-  const parsed = parseCOP(value)
-  return Math.max(0, Math.round(parsed))
-}
 
 const formatDateLabel = (value) => {
   if (!value) return 'Sin datos'
@@ -45,10 +40,11 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
   const [currentWallet, setCurrentWallet] = useState(wallet)
   const [editError, setEditError] = useState('')
   const [editNotice, setEditNotice] = useState('')
+  const [balanceAdjustMode, setBalanceAdjustMode] = useState('add')
   const [editForm, setEditForm] = useState({
     name: wallet.name,
     icon: normalizeIconKey(wallet.icon, 'wallet'),
-    balanceInput: String(normalizeCOPAmount(wallet.balance))
+    balanceInput: formatCOPInput(wallet.balance)
   })
 
   useEffect(() => {
@@ -56,8 +52,9 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
     setEditForm({
       name: wallet.name,
       icon: normalizeIconKey(wallet.icon, 'wallet'),
-      balanceInput: String(normalizeCOPAmount(wallet.balance)),
+      balanceInput: formatCOPInput(wallet.balance),
     })
+    setBalanceAdjustMode('add')
     setIsEditing(false)
     setEditError('')
     setEditNotice('')
@@ -213,8 +210,13 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
     const nextValue = Math.max(0, normalizeCOPAmount(editForm.balanceInput) + amount)
     setEditForm(prev => ({
       ...prev,
-      balanceInput: String(nextValue),
+      balanceInput: formatCOPInput(nextValue),
     }))
+  }
+
+  const applyBalanceStepByMode = (step) => {
+    const sign = balanceAdjustMode === 'add' ? 1 : -1
+    applyBalanceQuickAmount(step * sign)
   }
 
   const handleDelete = async () => {
@@ -235,7 +237,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
       setEditForm({
         name: currentWallet.name,
         icon: normalizeIconKey(currentWallet.icon, 'wallet'),
-        balanceInput: String(normalizeCOPAmount(currentWallet.balance)),
+        balanceInput: formatCOPInput(currentWallet.balance),
       })
     }
     setIsEditing(!isEditing)
@@ -373,51 +375,54 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
                       }
                     }}
                     onChange={(e) => {
-                      const nextValue = e.target.value
-                      if (nextValue === '') {
-                        setEditForm(prev => ({ ...prev, balanceInput: '' }))
-                        return
-                      }
-                      if (/^[\d.,\s]+$/.test(nextValue)) {
-                        setEditForm(prev => ({ ...prev, balanceInput: nextValue }))
-                      }
+                      setEditForm(prev => ({ ...prev, balanceInput: formatCOPInputFromRaw(e.target.value) }))
                     }}
                     onBlur={() => {
-                      if (!editForm.balanceInput) {
-                        setEditForm(prev => ({ ...prev, balanceInput: '0' }))
-                        return
-                      }
-                      setEditForm(prev => ({ ...prev, balanceInput: String(normalizeCOPAmount(prev.balanceInput)) }))
+                      setEditForm(prev => ({ ...prev, balanceInput: formatCOPInput(prev.balanceInput) }))
                     }}
                     className="text-2xl font-bold"
                   />
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                    <div className="grid grid-cols-2 gap-2">
                       <Button
-                        key={`detail-add-${quickAmount}`}
                         type="button"
-                        variant="outline"
+                        variant={balanceAdjustMode === 'add' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => applyBalanceQuickAmount(quickAmount)}
+                        className={balanceAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                        onClick={() => setBalanceAdjustMode('add')}
                       >
-                        + {formatCOP(quickAmount)}
+                        Sumar
                       </Button>
-                    ))}
-                    {QUICK_AMOUNT_STEPS.map((quickAmount) => (
                       <Button
-                        key={`detail-sub-${quickAmount}`}
                         type="button"
-                        variant="outline"
+                        variant={balanceAdjustMode === 'subtract' ? 'destructive' : 'outline'}
                         size="sm"
-                        onClick={() => applyBalanceQuickAmount(-quickAmount)}
+                        className={balanceAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                        onClick={() => setBalanceAdjustMode('subtract')}
                       >
-                        - {formatCOP(quickAmount)}
+                        Restar
                       </Button>
-                    ))}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                        <Button
+                          key={`detail-balance-step-${quickAmount}`}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={`justify-start ${
+                            balanceAdjustMode === 'add'
+                              ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                              : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                          }`}
+                          onClick={() => applyBalanceStepByMode(quickAmount)}
+                        >
+                          {balanceAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(editForm.balanceInput))}</span>
-                  </p>
                 </div>
               ) : (
                 <p className="text-3xl font-bold text-primary">{formatCOP(baseAmount)}</p>

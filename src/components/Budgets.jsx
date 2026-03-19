@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { ProgressBar } from './ui/ProgressBar';
 import { Input } from './ui/Input';
-import { formatCOP, parseCOP } from '../lib/currency';
+import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency';
 import { Trash2 } from 'lucide-react';
 import { BUDGET_ICON_OPTIONS, IconGlyph, normalizeIconKey } from '../lib/icons';
 import { BudgetsSkeleton } from './RouteSkeletons';
@@ -22,11 +22,6 @@ const TABS = [
 ];
 
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000];
-
-const normalizeCOPAmount = (value) => {
-  const parsed = parseCOP(value);
-  return Math.max(0, Math.round(parsed));
-};
 
 function IconPicker({ value, onChange }) {
   return (
@@ -63,12 +58,14 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
   const [selectedBudget, setSelectedBudget] = useState(null);
   const [activeTab, setActiveTab] = useState('active');
   const [formError, setFormError] = useState('');
+  const [targetAdjustMode, setTargetAdjustMode] = useState('add');
 
   const openCreateForm = () => {
     setEditing(null);
     setFormError('');
     setFormData({ name: '', target: 0, icon: 'piggy-bank' });
     setTargetInput('0');
+    setTargetAdjustMode('add');
     setShowForm(true);
   };
 
@@ -123,12 +120,18 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
     }
     setFormData({ name: '', target: 0, icon: 'piggy-bank' });
     setTargetInput('0');
+    setTargetAdjustMode('add');
     setShowForm(false);
   };
 
   const applyTargetQuickDelta = (delta) => {
     const nextValue = Math.max(0, normalizeCOPAmount(targetInput) + delta);
-    setTargetInput(String(nextValue));
+    setTargetInput(formatCOPInput(nextValue));
+  };
+
+  const applyTargetStepByMode = (step) => {
+    const sign = targetAdjustMode === 'add' ? 1 : -1;
+    applyTargetQuickDelta(step * sign);
   };
 
   const handleEdit = (budget) => {
@@ -136,7 +139,8 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
     setFormError('');
     const iconKey = normalizeIconKey(budget.icon, 'piggy-bank');
     setFormData({ name: budget.name, target: budget.target, icon: iconKey });
-    setTargetInput(String(normalizeCOPAmount(budget.target)));
+    setTargetInput(formatCOPInput(budget.target));
+    setTargetAdjustMode('add');
     setShowForm(true);
   };
 
@@ -148,6 +152,7 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
         setEditing(null);
         setFormData({ name: '', target: 0, icon: 'piggy-bank' });
         setTargetInput('0');
+        setTargetAdjustMode('add');
       }
     }
   };
@@ -339,52 +344,55 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
                   if (targetInput === '0') setTargetInput('');
                 }}
                 onChange={e => {
-                  const nextValue = e.target.value;
-                  if (nextValue === '') {
-                    setTargetInput('');
-                    return;
-                  }
-                  if (/^[\d.,\s]+$/.test(nextValue)) {
-                    setTargetInput(nextValue);
-                  }
+                  setTargetInput(formatCOPInputFromRaw(e.target.value));
                 }}
                 onBlur={() => {
-                  if (!targetInput) {
-                    setTargetInput('0');
-                    return;
-                  }
-                  setTargetInput(String(normalizeCOPAmount(targetInput)));
+                  setTargetInput(formatCOPInput(targetInput));
                 }}
                 required
                 min={1}
               />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                <div className="grid grid-cols-2 gap-2">
                   <Button
-                    key={`budget-add-${quickAmount}`}
                     type="button"
-                    variant="outline"
+                    variant={targetAdjustMode === 'add' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => applyTargetQuickDelta(quickAmount)}
+                    className={targetAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                    onClick={() => setTargetAdjustMode('add')}
                   >
-                    + {formatCOP(quickAmount)}
+                    Sumar
                   </Button>
-                ))}
-                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
                   <Button
-                    key={`budget-sub-${quickAmount}`}
                     type="button"
-                    variant="outline"
+                    variant={targetAdjustMode === 'subtract' ? 'destructive' : 'outline'}
                     size="sm"
-                    onClick={() => applyTargetQuickDelta(-quickAmount)}
+                    className={targetAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                    onClick={() => setTargetAdjustMode('subtract')}
                   >
-                    - {formatCOP(quickAmount)}
+                    Restar
                   </Button>
-                ))}
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                    <Button
+                      key={`budget-step-${quickAmount}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={`justify-start ${
+                        targetAdjustMode === 'add'
+                          ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                          : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                      }`}
+                      onClick={() => applyTargetStepByMode(quickAmount)}
+                    >
+                      {targetAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                    </Button>
+                  ))}
+                </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(targetInput))}</span>
-              </p>
             </div>
             <IconPicker
               value={formData.icon}
@@ -403,7 +411,7 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
                 </Button>
               )}
               <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ name: '', target: 0, icon: 'piggy-bank' }); setTargetInput('0'); }}>Cancelar</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ name: '', target: 0, icon: 'piggy-bank' }); setTargetInput('0'); setTargetAdjustMode('add'); }}>Cancelar</Button>
             </div>
           </form>
         </div>

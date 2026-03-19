@@ -6,7 +6,7 @@ import { accountMembersService, accountTransfersService, usersService, walletsSe
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select, SelectContent, SelectEmpty, SelectItem, SelectTrigger } from './ui/Select'
-import { formatCOP, parseCOP } from '../lib/currency'
+import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
 import { AccountsSkeleton } from './RouteSkeletons'
 
 const CARD_VISUALS = [
@@ -54,11 +54,6 @@ const getErrorMessage = (error, fallback) => {
   return error.message || fallback
 }
 
-const normalizeCOPAmount = (value) => {
-  const parsed = parseCOP(value)
-  return Math.max(0, Math.round(parsed))
-}
-
 const getProfileName = (profileData) => {
   if (Array.isArray(profileData)) {
     return profileData[0]?.name || ''
@@ -97,6 +92,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     amount: '0',
     note: '',
   })
+  const [contributionAdjustMode, setContributionAdjustMode] = useState('add')
   const [transfers, setTransfers] = useState([])
   const [transfersLoading, setTransfersLoading] = useState(false)
   const [transfersError, setTransfersError] = useState('')
@@ -268,6 +264,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       amount: '0',
       note: '',
     })
+    setContributionAdjustMode('add')
   }
 
   const openContributionModal = async (targetAccount) => {
@@ -349,6 +346,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       amount: '0',
       note: '',
     })
+    setContributionAdjustMode('add')
     setContributionLoading(false)
   }
 
@@ -509,7 +507,8 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       setContributionError(getErrorMessage(transferError, 'Could not process contribution.'))
     } else {
       setContributionNotice('Aporte registrado correctamente.')
-      setContributionForm(prev => ({ ...prev, amount: '0', note: '' }))
+      setContributionForm(prev => ({ ...prev, amount: formatCOPInput(0), note: '' }))
+      setContributionAdjustMode('add')
       await loadTransfersHistory()
     }
 
@@ -518,7 +517,12 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
   const applyContributionAmountDelta = (delta) => {
     const nextValue = Math.max(0, normalizeCOPAmount(contributionForm.amount) + delta)
-    setContributionForm(prev => ({ ...prev, amount: String(nextValue) }))
+    setContributionForm(prev => ({ ...prev, amount: formatCOPInput(nextValue) }))
+  }
+
+  const applyContributionStepByMode = (step) => {
+    const sign = contributionAdjustMode === 'add' ? 1 : -1
+    applyContributionAmountDelta(step * sign)
   }
 
   const handleUpdateMemberRole = async (member, role) => {
@@ -927,48 +931,54 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       }
                     }}
                     onChange={(e) => {
-                      const nextValue = e.target.value
-                      if (nextValue === '') {
-                        setContributionForm(prev => ({ ...prev, amount: '' }))
-                        return
-                      }
-                      if (/^[\d.,\s]+$/.test(nextValue)) {
-                        setContributionForm(prev => ({ ...prev, amount: nextValue }))
-                      }
+                      setContributionForm(prev => ({ ...prev, amount: formatCOPInputFromRaw(e.target.value) }))
                     }}
                     onBlur={() => {
-                      const normalized = String(normalizeCOPAmount(contributionForm.amount))
-                      setContributionForm(prev => ({ ...prev, amount: normalized }))
+                      setContributionForm(prev => ({ ...prev, amount: formatCOPInput(contributionForm.amount) }))
                     }}
                     disabled={contributionSubmitting}
                   />
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                    <div className="grid grid-cols-2 gap-2">
                       <Button
-                        key={`contrib-add-${quickAmount}`}
                         type="button"
-                        variant="outline"
+                        variant={contributionAdjustMode === 'add' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => applyContributionAmountDelta(quickAmount)}
+                        className={contributionAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                        onClick={() => setContributionAdjustMode('add')}
                       >
-                        + {formatCOP(quickAmount)}
+                        Sumar
                       </Button>
-                    ))}
-                    {QUICK_AMOUNT_STEPS.map((quickAmount) => (
                       <Button
-                        key={`contrib-sub-${quickAmount}`}
                         type="button"
-                        variant="outline"
+                        variant={contributionAdjustMode === 'subtract' ? 'destructive' : 'outline'}
                         size="sm"
-                        onClick={() => applyContributionAmountDelta(-quickAmount)}
+                        className={contributionAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                        onClick={() => setContributionAdjustMode('subtract')}
                       >
-                        - {formatCOP(quickAmount)}
+                        Restar
                       </Button>
-                    ))}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                        <Button
+                          key={`contrib-step-${quickAmount}`}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={`justify-start ${
+                            contributionAdjustMode === 'add'
+                              ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                              : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                          }`}
+                          onClick={() => applyContributionStepByMode(quickAmount)}
+                        >
+                          {contributionAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(contributionForm.amount))}</span>
-                  </p>
                   {selectedContributionSourceWallet && previewContributionAmount > normalizeCOPAmount(selectedContributionSourceWallet.balance) && (
                     <p className="mt-1 text-xs text-destructive">
                       Advertencia: saldo insuficiente en billetera origen. Disponible: {formatCOP(selectedContributionSourceWallet.balance)}.

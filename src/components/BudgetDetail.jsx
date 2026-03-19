@@ -1,9 +1,11 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, PencilLine } from 'lucide-react'
 import { Button } from './ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
 import { ProgressBar } from './ui/ProgressBar'
 import { formatCOP } from '../lib/currency'
 import { IconGlyph } from '../lib/icons'
+import { useBudgetEvents } from '../hooks/useBudgetEvents'
+import { useAuth } from '../contexts/AuthContext'
 
 const formatDate = (value) => {
   if (!value) return 'Sin fecha'
@@ -13,11 +15,39 @@ const formatDate = (value) => {
 }
 
 export default function BudgetDetail({ budget, allocations, onBack, onEdit }) {
+  const { user } = useAuth()
+  const { events: budgetEvents, loading: eventsLoading, error: eventsError } = useBudgetEvents(budget?.id)
   const totalAssigned = allocations.reduce((sum, allocation) => sum + (allocation.amount || 0), 0)
   const target = budget?.target || 0
   const progress = target > 0 ? Math.min((totalAssigned / target) * 100, 100) : 0
   const remaining = Math.max(target - totalAssigned, 0)
   const sortedMovements = [...allocations].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const sortedEditEvents = [...budgetEvents].sort((a, b) => new Date(b.changed_at) - new Date(a.changed_at))
+
+  const getChangeLines = (event) => {
+    const changedFields = Array.isArray(event?.changed_fields) ? event.changed_fields : []
+    const oldData = event?.old_data || {}
+    const newData = event?.new_data || {}
+    const lines = []
+
+    if (changedFields.includes('name') && oldData?.name !== newData?.name) {
+      lines.push(`Nombre: "${oldData?.name || 'Sin nombre'}" -> "${newData?.name || 'Sin nombre'}"`)
+    }
+
+    if (changedFields.includes('target') && oldData?.target !== newData?.target) {
+      lines.push(`Meta: ${formatCOP(oldData?.target || 0)} -> ${formatCOP(newData?.target || 0)}`)
+    }
+
+    if (changedFields.includes('icon') && oldData?.icon !== newData?.icon) {
+      lines.push(`Ícono: ${oldData?.icon || 'sin ícono'} -> ${newData?.icon || 'sin ícono'}`)
+    }
+
+    if (lines.length === 0) {
+      lines.push('Se actualizaron datos del presupuesto.')
+    }
+
+    return lines
+  }
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
@@ -87,6 +117,54 @@ export default function BudgetDetail({ budget, allocations, onBack, onEdit }) {
                   </div>
                 </article>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Historial de ediciones del presupuesto</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {eventsLoading ? (
+            <p className="text-sm text-muted-foreground">Cargando historial de ediciones...</p>
+          ) : eventsError ? (
+            <p className="text-sm text-destructive">No se pudo cargar el historial de ediciones.</p>
+          ) : sortedEditEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aún no hay ediciones registradas para este presupuesto.</p>
+          ) : (
+            <div className="space-y-3">
+              {sortedEditEvents.map((event) => {
+                const changedByLabel = event.changed_by === user?.id ? 'Tú' : 'Miembro'
+                const changeLines = getChangeLines(event)
+
+                return (
+                  <article key={event.id} className="rounded-lg border border-border p-3 sm:p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                          <PencilLine className="h-4 w-4 text-primary" />
+                          Edición de presupuesto
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {changedByLabel} - {formatDate(event.changed_at)}
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          {changeLines.map((line, index) => (
+                            <p key={`${event.id}-change-${index}`} className="text-xs text-muted-foreground break-words">
+                              {line}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                        Editado
+                      </span>
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           )}
         </CardContent>

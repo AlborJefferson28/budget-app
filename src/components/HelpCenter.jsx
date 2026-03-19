@@ -1,10 +1,12 @@
 import {
   ArrowRight,
   BookOpen,
+  CheckCircle2,
   CircleHelp,
   LayoutDashboard,
   PieChart,
   Settings,
+  Sparkles,
   Target,
   Users,
   Wallet,
@@ -89,46 +91,83 @@ const GUIDE_SECTIONS = [
 ];
 
 const QUICK_START = [
-  '1) Ve a Cuentas y selecciona tu cuenta activa.',
-  '2) Crea 1 o 2 billeteras iniciales (ej: Sueldo y Ahorro).',
-  '3) Crea tus presupuestos principales (ej: Arriendo, Servicios).',
-  '4) Realiza movimientos entre billeteras y luego asigna dinero a presupuestos.',
-  '5) Revisa el Panel para controlar progreso y actividad.',
+  {
+    title: 'Selecciona tu cuenta activa',
+    description: 'Ve a Cuentas y confirma en qué cuenta vas a trabajar.',
+  },
+  {
+    title: 'Crea 1 o 2 billeteras iniciales',
+    description: 'Por ejemplo: Sueldo y Ahorro.',
+  },
+  {
+    title: 'Configura tus presupuestos principales',
+    description: 'Por ejemplo: Arriendo, Servicios, Mercado.',
+  },
+  {
+    title: 'Mueve dinero y asigna a presupuestos',
+    description: 'Primero entre billeteras y luego hacia tus metas.',
+  },
+  {
+    title: 'Monitorea todo desde el panel',
+    description: 'Valida progreso, actividad reciente y totales.',
+  },
 ];
 
 export default function HelpCenter({ setPage }) {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-start gap-3">
-            <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <BookOpen className="h-4 w-4" />
-            </span>
-            <div>
-              <CardTitle className="text-2xl">Ayuda y tutoriales</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Guía completa para empezar y usar cada opción de la app.
-              </p>
+      <Card className="relative overflow-hidden border-border/80 bg-gradient-to-br from-card via-card to-primary/5">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/15 blur-3xl"
+        />
+        <CardHeader className="relative pb-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                <BookOpen className="h-5 w-5" />
+              </span>
+              <div>
+                <CardTitle className="text-2xl sm:text-3xl">Ayuda y tutoriales</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Guía completa para empezar y usar cada opción de la app.
+                </p>
+              </div>
             </div>
+            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              Ruta recomendada
+            </span>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg border border-border bg-muted/40 p-4">
-            <p className="text-sm font-semibold text-foreground">Inicio rápido recomendado</p>
-            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-              {QUICK_START.map((item) => (
-                <p key={item}>{item}</p>
-              ))}
+        <CardContent className="relative space-y-4">
+          <div className="rounded-xl border border-border/80 bg-background/60 p-4 backdrop-blur-sm sm:p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              <p className="text-sm font-semibold text-foreground">Inicio rápido recomendado</p>
             </div>
+            <ol className="space-y-2.5">
+              {QUICK_START.map((item, index) => (
+                <li key={item.title} className="flex items-start gap-3 rounded-lg border border-border/60 bg-card/80 p-3">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-xs font-bold text-primary">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                  </div>
+                  <CheckCircle2 className="mt-0.5 hidden h-4 w-4 shrink-0 text-primary/80 sm:block" />
+                </li>
+              ))}
+            </ol>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setPage('accounts')} className="h-9">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button onClick={() => setPage('accounts')} className="h-10 sm:h-9">
               Empezar ahora
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <Button variant="outline" onClick={() => setPage('dashboard')} className="h-9">
+            <Button variant="outline" onClick={() => setPage('dashboard')} className="h-10 sm:h-9">
               Volver al panel
             </Button>
           </div>
