@@ -18,7 +18,7 @@ export default function Signup({ onSwitchToLogin }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signUp } = useAuth()
+  const { signUp, signIn } = useAuth()
   const emailRef = useRef(null)
   const passwordRef = useRef(null)
   const confirmPasswordRef = useRef(null)
@@ -50,10 +50,18 @@ export default function Signup({ onSwitchToLogin }) {
       return
     }
     setLoading(true)
-    const { error } = await signUp(email, password)
-    if (error) {
-      setError(error.message)
+    const { error: signUpError } = await signUp(email, password)
+    if (signUpError) {
+      setError(signUpError.message)
+      setLoading(false)
+      return
     }
+
+    const { error: signInError } = await signIn(email, password)
+    if (signInError) {
+      setError(signInError.message || 'Cuenta creada, pero no fue posible iniciar sesión automáticamente.')
+    }
+
     setLoading(false)
   }
 
@@ -166,18 +174,15 @@ export default function Signup({ onSwitchToLogin }) {
             <p className="mt-2 text-xs text-muted-foreground">
               Registro con Google y Apple estará disponible pronto.
             </p>
+            <Button
+              type="button"
+              onClick={onSwitchToLogin}
+              className="mt-6 w-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+            >
+              Ya tengo cuenta, iniciar sesión
+            </Button>
           </CardContent>
         </Card>
-
-        {/* Enlace a login */}
-        <div className="text-center mt-6">
-          <p className="text-sm text-muted-foreground">
-            ¿Ya tienes una cuenta?{' '}
-            <button onClick={onSwitchToLogin} className="font-medium text-primary hover:text-primary/80">
-              Inicia sesión
-            </button>
-          </p>
-        </div>
       </div>
     </div>
   )

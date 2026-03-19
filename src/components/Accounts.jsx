@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRightLeft, BriefcaseBusiness, CirclePlus, Info, Pencil, PiggyBank, Plus, Trash2, UserPlus, Users } from 'lucide-react'
+import { ArrowRightLeft, BriefcaseBusiness, CirclePlus, Copy, Info, Pencil, PiggyBank, Plus, QrCode, ShieldCheck, Trash2, User, UserPlus, Users } from 'lucide-react'
 import { useAccounts } from '../hooks/useAccounts'
 import { useAuth } from '../contexts/AuthContext'
 import { accountMembersService, accountTransfersService, usersService, walletsService } from '../services'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
+import { Select, SelectContent, SelectEmpty, SelectItem, SelectTrigger } from './ui/Select'
 import { formatCOP, parseCOP } from '../lib/currency'
 import { AccountsSkeleton } from './RouteSkeletons'
 
@@ -14,7 +15,10 @@ const CARD_VISUALS = [
   { icon: BriefcaseBusiness, container: 'bg-accent text-foreground' },
 ]
 
-const MEMBER_ROLES = ['member', 'admin']
+const MEMBER_ROLE_OPTIONS = [
+  { value: 'member', label: 'Miembro', icon: User },
+  { value: 'admin', label: 'Admin', icon: ShieldCheck },
+]
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
 
@@ -62,14 +66,8 @@ const getProfileName = (profileData) => {
   return profileData?.name || ''
 }
 
-const shortId = (id) => {
-  if (!id) return ''
-  if (id.length <= 14) return id
-  return `${id.slice(0, 8)}...${id.slice(-4)}`
-}
-
 export default function Accounts({ setPage, setSelectedAccount }) {
-  const { accounts, loading, error, createAccount, updateAccount, deleteAccount } = useAccounts()
+  const { accounts, loading, error, createAccount, updateAccount, deleteAccount, notifyAccountsChanged } = useAccounts()
   const { user } = useAuth()
 
   const [showForm, setShowForm] = useState(false)
@@ -112,8 +110,17 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     return 'Tú'
   }, [user])
 
+  const isOwnerAccount = (account) => account?.owner_id === user?.id
+  const getAccountRole = (account) => (isOwnerAccount(account) ? 'owner' : 'contributor')
+  const getAccountRoleLabel = (account) => (getAccountRole(account) === 'owner' ? 'Propietario' : 'Contribuyente')
+  const getAccountParticipantsCount = (account) => {
+    if (Number.isFinite(account?.participants_count)) return account.participants_count
+    return account?.owner_id === user?.id
+      ? (account?.kind === 'shared' ? 2 : 1)
+      : 2
+  }
   const isOwnerOfMembersAccount = membersAccount?.owner_id === user?.id
-  const isSharedAccount = (account) => account?.kind === 'shared' || account?.owner_id !== user?.id
+  const isSharedAccount = (account) => getAccountParticipantsCount(account) > 1
   const accountNamesById = useMemo(() => {
     const map = {}
     accounts.forEach(account => { map[account.id] = account.name })
@@ -127,12 +134,26 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     )
   }, [transfers, transferFilterAccount])
 
-  const getAccountDisplayName = (accountId) => accountNamesById[accountId] || shortId(accountId)
-  const getWalletDisplayName = (walletId) => walletNamesById[walletId] || shortId(walletId)
+  const selectedContributionSourceWallet = useMemo(
+    () => sourceWallets.find(wallet => wallet.id === contributionForm.from_wallet) || null,
+    [sourceWallets, contributionForm.from_wallet]
+  )
+  const selectedContributionTargetWallet = useMemo(
+    () => targetWallets.find(wallet => wallet.id === contributionForm.to_wallet) || null,
+    [targetWallets, contributionForm.to_wallet]
+  )
+  const previewContributionAmount = useMemo(
+    () => normalizeCOPAmount(contributionForm.amount),
+    [contributionForm.amount]
+  )
+
+  const getAccountDisplayName = (accountId) => accountNamesById[accountId] || 'Cuenta'
+  const getWalletDisplayName = (walletId) => walletNamesById[walletId] || 'Billetera'
+  const getRoleOption = (role) => MEMBER_ROLE_OPTIONS.find(item => item.value === role) || MEMBER_ROLE_OPTIONS[0]
   const getTransferAuthorLabel = (createdBy) => {
     if (!createdBy) return 'Usuario eliminado'
     if (createdBy === user?.id) return `${currentUserLabel} (Tú)`
-    return shortId(createdBy)
+    return 'Usuario'
   }
 
   const loadTransfersHistory = async () => {
@@ -250,6 +271,20 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   }
 
   const openContributionModal = async (targetAccount) => {
+    if (!targetAccount) return
+
+    if (!isSharedAccount(targetAccount) || getAccountRole(targetAccount) !== 'contributor') {
+      setContributionAccount(targetAccount)
+      setSourceWallets([])
+      setTargetWallets([])
+      setContributionLoading(false)
+      setContributionSubmitting(false)
+      setContributionNotice('')
+      setContributionError('Solo los contribuyentes pueden aportar a una cuenta compartida.')
+      setShowContributionModal(true)
+      return
+    }
+
     setContributionAccount(targetAccount)
     setShowContributionModal(true)
     setContributionLoading(true)
@@ -320,7 +355,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   const resolveUserId = async (identifier) => {
     const value = identifier.trim()
     if (!value) {
-      return { userId: null, error: 'Enter an email or user UUID.' }
+      return { userId: null, error: 'Ingresa un correo electrónico.' }
     }
 
     if (UUID_REGEX.test(value)) {
@@ -341,7 +376,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       return { userId: data.id, error: null }
     }
 
-    return { userId: null, error: 'Use a valid email or UUID.' }
+    return { userId: null, error: 'Ingresa un correo electrónico válido.' }
   }
 
   const handleSubmit = async (e) => {
@@ -416,6 +451,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       setMemberForm({ identifier: '', role: 'member' })
       setMembersNotice('Member added successfully.')
       await loadMembers(membersAccount.id)
+      notifyAccountsChanged()
     }
 
     setMembersBusy(false)
@@ -424,6 +460,10 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   const handleContributionSubmit = async (e) => {
     e.preventDefault()
     if (!contributionAccount) return
+    if (getAccountRole(contributionAccount) !== 'contributor') {
+      setContributionError('Solo los contribuyentes pueden aportar a una cuenta compartida.')
+      return
+    }
 
     const parsedAmount = normalizeCOPAmount(contributionForm.amount)
     if (!contributionForm.from_wallet || !contributionForm.to_wallet) {
@@ -432,6 +472,25 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     }
     if (!parsedAmount || parsedAmount <= 0) {
       setContributionError('Enter a valid amount greater than 0.')
+      return
+    }
+
+    const sourceWallet = sourceWallets.find(wallet => wallet.id === contributionForm.from_wallet)
+    const destinationWallet = targetWallets.find(wallet => wallet.id === contributionForm.to_wallet)
+
+    if (!sourceWallet || !destinationWallet) {
+      setContributionError('Selecciona billeteras válidas para origen y destino.')
+      return
+    }
+
+    if (sourceWallet.id === destinationWallet.id) {
+      setContributionError('La billetera de origen y destino no pueden ser la misma.')
+      return
+    }
+
+    const sourceAvailable = normalizeCOPAmount(sourceWallet.balance)
+    if (parsedAmount > sourceAvailable) {
+      setContributionError(`Saldo insuficiente en billetera origen. Disponible: ${formatCOP(sourceAvailable)}.`)
       return
     }
 
@@ -449,7 +508,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     if (transferError) {
       setContributionError(getErrorMessage(transferError, 'Could not process contribution.'))
     } else {
-      setContributionNotice(`Contribution completed. Transfer id: ${shortId(data)}`)
+      setContributionNotice('Aporte registrado correctamente.')
       setContributionForm(prev => ({ ...prev, amount: '0', note: '' }))
       await loadTransfersHistory()
     }
@@ -464,6 +523,10 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
   const handleUpdateMemberRole = async (member, role) => {
     if (!membersAccount || !isOwnerOfMembersAccount || role === member.role) return
+    if (member.user_id === user?.id) {
+      setMembersError('No puedes cambiar tu propio rol en esta cuenta.')
+      return
+    }
 
     setMembersBusy(true)
     setMembersError('')
@@ -485,8 +548,12 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
   const handleRemoveMember = async (member) => {
     if (!membersAccount || !isOwnerOfMembersAccount) return
+    if (member.user_id === user?.id) {
+      setMembersError('No puedes eliminarte a ti mismo de esta cuenta.')
+      return
+    }
 
-    if (!window.confirm(`Remove ${getProfileName(member.profiles) || shortId(member.user_id)} from this account?`)) {
+    if (!window.confirm(`¿Eliminar a ${getProfileName(member.profiles) || 'este miembro'} de esta cuenta?`)) {
       return
     }
 
@@ -501,6 +568,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     } else {
       setMembers(prevMembers => prevMembers.filter(item => item.user_id !== member.user_id))
       setMembersNotice('Member removed.')
+      notifyAccountsChanged()
     }
 
     setMembersBusy(false)
@@ -591,14 +659,13 @@ export default function Accounts({ setPage, setSelectedAccount }) {
             )}
 
             <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Owner</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Propietario</p>
               <div className="mt-1 flex items-center justify-between gap-2">
                 <p className="font-semibold text-foreground">
-                  {membersAccount.owner_id === user?.id ? `${currentUserLabel} (Tú)` : shortId(membersAccount.owner_id)}
+                  {membersAccount.owner_id === user?.id ? `${currentUserLabel} (Tú)` : 'Propietario de la cuenta'}
                 </p>
-                <span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold text-foreground">owner</span>
+                <span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold text-foreground">propietario</span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{membersAccount.owner_id}</p>
             </div>
 
             {isOwnerOfMembersAccount ? (
@@ -606,10 +673,10 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                 <p className="mb-3 text-sm font-medium text-foreground">Agregar miembro</p>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_auto] md:items-end">
                   <div>
-                    <label className="mb-1 block text-sm text-muted-foreground">Email o UUID del usuario</label>
+                    <label className="mb-1 block text-sm text-muted-foreground">Correo del usuario</label>
                     <Input
                       type="text"
-                      placeholder="member@email.com or UUID"
+                      placeholder="usuario@email.com"
                       value={memberForm.identifier}
                       onChange={(e) => setMemberForm(prev => ({ ...prev, identifier: e.target.value }))}
                       disabled={membersBusy}
@@ -618,16 +685,43 @@ export default function Accounts({ setPage, setSelectedAccount }) {
 
                   <div>
                     <label className="mb-1 block text-sm text-muted-foreground">Rol</label>
-                    <select
+                    <Select
                       value={memberForm.role}
-                      onChange={(e) => setMemberForm(prev => ({ ...prev, role: e.target.value }))}
+                      onValueChange={(value) => setMemberForm(prev => ({ ...prev, role: value }))}
                       disabled={membersBusy}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
-                      {MEMBER_ROLES.map(role => (
-                        <option key={role} value={role}>{role}</option>
-                      ))}
-                    </select>
+                      <SelectTrigger>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const selectedRole = getRoleOption(memberForm.role)
+                            const RoleIcon = selectedRole.icon
+                            return (
+                              <>
+                                <RoleIcon className="h-4 w-4 text-muted-foreground" />
+                                <span>{selectedRole.label}</span>
+                              </>
+                            )
+                          })()}
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MEMBER_ROLE_OPTIONS.length === 0 ? (
+                          <SelectEmpty>No hay roles disponibles</SelectEmpty>
+                        ) : (
+                          MEMBER_ROLE_OPTIONS.map((roleOption) => {
+                            const RoleIcon = roleOption.icon
+                            return (
+                              <SelectItem key={roleOption.value} value={roleOption.value}>
+                                <div className="flex items-center gap-2">
+                                  <RoleIcon className="h-4 w-4 text-muted-foreground" />
+                                  <span>{roleOption.label}</span>
+                                </div>
+                              </SelectItem>
+                            )
+                          })
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <Button type="submit" disabled={membersBusy} className="h-10">
@@ -641,17 +735,45 @@ export default function Accounts({ setPage, setSelectedAccount }) {
               </div>
             )}
 
+            <section className="mb-6 rounded-lg border border-dashed border-border p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <QrCode className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Invitar con QR</p>
+                    <p className="text-xs text-muted-foreground">Comparte este QR para que otro usuario se una a esta cuenta.</p>
+                  </div>
+                </div>
+                <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto">
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copiar enlace
+                </Button>
+              </div>
+              <div className="mt-4 flex justify-center">
+                <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-border bg-muted/50">
+                  <QrCode className="h-20 w-20 text-muted-foreground" />
+                </div>
+              </div>
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Vista previa visual. Integración activa próximamente.
+              </p>
+            </section>
+
             <div>
-              <p className="mb-3 text-sm font-semibold text-foreground">Current Members</p>
+              <p className="mb-3 text-sm font-semibold text-foreground">Miembros actuales</p>
 
               {membersLoading ? (
                 <p className="text-sm text-muted-foreground">Cargando miembros...</p>
-              ) : members.length === 0 ? (
+              ) : members.filter(member => member.user_id !== membersAccount.owner_id).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Aún no hay miembros agregados.</p>
               ) : (
                 <div className="space-y-3">
-                  {members.map(member => {
-                    const displayName = getProfileName(member.profiles) || shortId(member.user_id)
+                  {members
+                    .filter(member => member.user_id !== membersAccount.owner_id)
+                    .map(member => {
+                    const displayName = getProfileName(member.profiles) || 'Miembro'
                     const isCurrentUser = member.user_id === user?.id
 
                     return (
@@ -661,23 +783,45 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                             <p className="font-semibold text-foreground">
                               {displayName} {isCurrentUser ? '(Tú)' : ''}
                             </p>
-                            <p className="text-xs text-muted-foreground">{member.user_id}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">Added: {formatDate(member.created_at)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Agregado: {formatDate(member.created_at)}</p>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
-                            <select
+                            <Select
                               value={member.role}
-                              disabled={!isOwnerOfMembersAccount || membersBusy}
-                              onChange={(e) => handleUpdateMemberRole(member, e.target.value)}
-                              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              disabled={!isOwnerOfMembersAccount || membersBusy || isCurrentUser}
+                              onValueChange={(value) => handleUpdateMemberRole(member, value)}
                             >
-                              {MEMBER_ROLES.map(role => (
-                                <option key={role} value={role}>{role}</option>
-                              ))}
-                            </select>
+                              <SelectTrigger className="h-9 min-w-[140px]">
+                                <div className="flex items-center gap-2">
+                                  {(() => {
+                                    const selectedRole = getRoleOption(member.role)
+                                    const RoleIcon = selectedRole.icon
+                                    return (
+                                      <>
+                                        <RoleIcon className="h-4 w-4 text-muted-foreground" />
+                                        <span>{selectedRole.label}</span>
+                                      </>
+                                    )
+                                  })()}
+                                </div>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {MEMBER_ROLE_OPTIONS.map((roleOption) => {
+                                  const RoleIcon = roleOption.icon
+                                  return (
+                                    <SelectItem key={roleOption.value} value={roleOption.value}>
+                                      <div className="flex items-center gap-2">
+                                        <RoleIcon className="h-4 w-4 text-muted-foreground" />
+                                        <span>{roleOption.label}</span>
+                                      </div>
+                                    </SelectItem>
+                                  )
+                                })}
+                              </SelectContent>
+                            </Select>
 
-                            {isOwnerOfMembersAccount && (
+                            {isOwnerOfMembersAccount && !isCurrentUser && (
                               <Button
                                 type="button"
                                 variant="outline"
@@ -687,6 +831,9 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                               >
                                 Eliminar
                               </Button>
+                            )}
+                            {isCurrentUser && (
+                              <span className="text-xs text-muted-foreground">Tu rol no es editable.</span>
                             )}
                           </div>
                         </div>
@@ -771,6 +918,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                   <label className="mb-1 block text-sm text-muted-foreground">Monto</label>
                   <Input
                     type="text"
+                    numeric
                     placeholder="0"
                     value={contributionForm.amount}
                     onFocus={() => {
@@ -821,6 +969,16 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                   <p className="mt-2 text-xs text-muted-foreground">
                     Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(contributionForm.amount))}</span>
                   </p>
+                  {selectedContributionSourceWallet && previewContributionAmount > normalizeCOPAmount(selectedContributionSourceWallet.balance) && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Advertencia: saldo insuficiente en billetera origen. Disponible: {formatCOP(selectedContributionSourceWallet.balance)}.
+                    </p>
+                  )}
+                  {selectedContributionSourceWallet && selectedContributionTargetWallet && selectedContributionSourceWallet.id === selectedContributionTargetWallet.id && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Advertencia: origen y destino deben ser diferentes.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -856,9 +1014,10 @@ export default function Accounts({ setPage, setSelectedAccount }) {
         {accounts.map((account, index) => {
           const visual = CARD_VISUALS[index % CARD_VISUALS.length]
           const Icon = visual.icon
-          const isPrimary = account.owner_id === user?.id
+          const isPrimary = isOwnerAccount(account)
           const isShared = isSharedAccount(account)
-          const ownerLabel = isPrimary ? currentUserLabel : 'Propietario'
+          const roleLabel = getAccountRoleLabel(account)
+          const ownerLabel = isPrimary ? `${currentUserLabel} (Tú)` : 'Otro usuario'
 
           return (
             <article
@@ -873,19 +1032,18 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="break-words text-xl font-bold text-foreground">{account.name}</h3>
                   <div className="flex flex-wrap justify-end gap-2">
-                    {isPrimary && (
-                      <span className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold tracking-[0.14em] text-primary">
-                        PRIMARY
-                      </span>
-                    )}
+                    <span className={`rounded-lg px-3 py-1 text-xs font-bold tracking-[0.12em] ${isPrimary ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'}`}>
+                      {roleLabel}
+                    </span>
                     <span className={`rounded-lg px-3 py-1 text-xs font-bold tracking-[0.12em] ${isShared ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                      {isShared ? 'SHARED' : 'PERSONAL'}
+                      {isShared ? 'Compartida' : 'Personal'}
                     </span>
                   </div>
                 </div>
 
-                <p className="mt-2 text-sm text-muted-foreground">Owner: {ownerLabel}</p>
-                <p className="mt-1 text-sm italic text-muted-foreground">Created: {formatDate(account.created_at)}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Propietario: {ownerLabel}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Tu acceso: {roleLabel}</p>
+                <p className="mt-1 text-sm italic text-muted-foreground">Creada: {formatDate(account.created_at)}</p>
 
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-5">
                   <div className="flex items-center gap-3">
@@ -898,7 +1056,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       Gestionar miembros
                     </button>
 
-                    {isShared && (
+                    {isShared && !isPrimary && (
                       <button
                         type="button"
                         onClick={() => openContributionModal(account)}
@@ -909,14 +1067,20 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(account)}
-                      className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <Pencil className="h-4 w-4" />
-                      Editar
-                    </button>
+                    {isPrimary ? (
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(account)}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                        Solo lectura
+                      </span>
+                    )}
                   </div>
 
                   <Button
@@ -1017,11 +1181,6 @@ export default function Accounts({ setPage, setSelectedAccount }) {
               Contactar soporte
             </button>
           </p>
-        </div>
-
-        <div className="flex items-center gap-6 text-sm font-semibold text-muted-foreground">
-          <button type="button" className="hover:text-foreground">Privacy Policy</button>
-          <button type="button" className="hover:text-foreground">Terms of Service</button>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Wallet, ArrowLeftRight, Target, PieChart, Users, Settings, Moon, Sun, CircleHelp } from 'lucide-react'
+import { LayoutDashboard, Wallet, Target, PieChart, Users, Settings, Moon, Sun, CircleHelp } from 'lucide-react'
 import UserCard from './UserCard'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -7,7 +7,6 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
   const items = [
     { name: 'Panel', page: 'dashboard', icon: LayoutDashboard },
     { name: 'Billeteras', page: 'wallets', icon: Wallet },
-    { name: 'Transacciones', page: 'transactions', icon: ArrowLeftRight },
     { name: 'Presupuestos', page: 'budgets', icon: Target },
     { name: 'Asignaciones', page: 'allocations', icon: PieChart },
     { name: 'Cuentas', page: 'accounts', icon: Users },
@@ -17,7 +16,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
 
   const handleItemClick = (page) => {
     setPage(page)
-    const accountScopedPages = ['wallets', 'transactions', 'budgets', 'allocations']
+    const accountScopedPages = ['wallets', 'budgets', 'allocations']
 
     if (accountScopedPages.includes(page) && !selectedAccount) {
       setSelectedAccount(accounts.length > 0 ? accounts[0].id : null)

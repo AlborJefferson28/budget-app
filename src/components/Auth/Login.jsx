@@ -86,7 +86,6 @@ export default function Login({ onSwitchToSignup }) {
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="block text-sm font-medium text-foreground">Contraseña</label>
-                  <button type="button" className="text-sm text-primary hover:text-primary/80">¿Olvidaste tu contraseña?</button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -149,16 +148,13 @@ export default function Login({ onSwitchToSignup }) {
             <p className="mt-2 text-xs text-muted-foreground">
               Inicio con Google y Apple estará disponible pronto.
             </p>
-
-            {/* Enlace para registrarse */}
-            <div className="text-center mt-6">
-              <p className="text-sm text-muted-foreground">
-                ¿No tienes una cuenta?{' '}
-                <button onClick={onSwitchToSignup} className="text-primary hover:text-primary/80 font-medium">
-                  Regístrate
-                </button>
-              </p>
-            </div>
+            <Button
+              type="button"
+              onClick={onSwitchToSignup}
+              className="mt-6 w-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+            >
+              Crear una cuenta nueva
+            </Button>
           </CardContent>
         </Card>
 

@@ -6,7 +6,6 @@ import Signup from './components/Auth/Signup'
 import Dashboard from './components/Dashboard'
 import Accounts from './components/Accounts'
 import Wallets from './components/Wallets'
-import Transactions from './components/Transactions'
 import Budgets from './components/Budgets'
 import Allocations from './components/Allocations'
 import ProfileSettings from './components/ProfileSettings'
@@ -23,12 +22,23 @@ function App() {
   const [authMode, setAuthMode] = useState('login') // 'login' or 'signup'
   const [currentPage, setCurrentPage] = useState('dashboard')
   const [selectedAccount, setSelectedAccount] = useState(null)
+  const [selectedWalletDetailId, setSelectedWalletDetailId] = useState(null)
+  const [selectedBudgetDetailId, setSelectedBudgetDetailId] = useState(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
   const { accounts } = useAccounts()
 
   const activeAccount = accounts.find(account => account.id === selectedAccount) || accounts[0] || null
   const activeAccountId = activeAccount?.id || null
+  const activeAccountRole = activeAccount?.owner_id === user?.id ? 'Propietario' : 'Contribuyente'
+  const activeAccountParticipants = Number.isFinite(activeAccount?.participants_count)
+    ? activeAccount.participants_count
+    : (activeAccount?.owner_id === user?.id
+      ? (activeAccount?.kind === 'shared' ? 2 : 1)
+      : 2)
+  const activeAccountType = activeAccount
+    ? (activeAccountParticipants > 1 ? 'Cuenta compartida' : 'Cuenta personal')
+    : ''
 
   useEffect(() => {
     if (selectedAccount && !accounts.some(account => account.id === selectedAccount)) {
@@ -69,7 +79,7 @@ function App() {
   }
 
   const renderPage = () => {
-    const accountScopedPages = ['wallets', 'transactions', 'budgets', 'allocations']
+    const accountScopedPages = ['wallets', 'budgets', 'allocations']
 
     if (accountScopedPages.includes(currentPage) && !activeAccountId) {
       return (
@@ -93,13 +103,42 @@ function App() {
       case 'accounts':
         return <Accounts setPage={setCurrentPage} setSelectedAccount={setSelectedAccount} />
       case 'wallets':
-        return <Wallets accountId={activeAccountId} setPage={setCurrentPage} />
+        return (
+          <Wallets
+            accountId={activeAccountId}
+            setPage={setCurrentPage}
+            selectedWalletId={selectedWalletDetailId}
+            onClearSelectedWallet={() => setSelectedWalletDetailId(null)}
+          />
+        )
       case 'transactions':
-        return <Transactions accountId={activeAccountId} setPage={setCurrentPage} />
+        return (
+          <Wallets
+            accountId={activeAccountId}
+            setPage={setCurrentPage}
+            selectedWalletId={selectedWalletDetailId}
+            onClearSelectedWallet={() => setSelectedWalletDetailId(null)}
+          />
+        )
       case 'budgets':
-        return <Budgets accountId={activeAccountId} setPage={setCurrentPage} />
+        return (
+          <Budgets
+            accountId={activeAccountId}
+            setPage={setCurrentPage}
+            selectedBudgetId={selectedBudgetDetailId}
+            onClearSelectedBudget={() => setSelectedBudgetDetailId(null)}
+          />
+        )
       case 'allocations':
-        return <Allocations accountId={activeAccountId} setPage={setCurrentPage} />
+        return (
+          <Allocations
+            accountId={activeAccountId}
+            setPage={setCurrentPage}
+            setSelectedWalletDetailId={setSelectedWalletDetailId}
+            setSelectedBudgetDetailId={setSelectedBudgetDetailId}
+            setSelectedAccount={setSelectedAccount}
+          />
+        )
       case 'profile':
         return <ProfileSettings />
       case 'help':
@@ -149,27 +188,28 @@ function App() {
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-foreground">{activeAccount.name}</p>
+                  <p className="text-xs text-muted-foreground">{activeAccountType}</p>
                   <p className="text-xs text-muted-foreground">
-                    {activeAccount.owner_id === user?.id
-                      ? (activeAccount.kind === 'shared' ? 'Cuenta compartida (Propietario)' : 'Cuenta personal')
-                      : 'Cuenta compartida (Colaborador)'}
+                    Rol actual: <span className="font-semibold text-foreground">{activeAccountRole}</span>
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage('accounts')}
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-accent w-full sm:w-auto"
-                >
-                  Cambiar cuenta
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage('help')}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-accent w-full sm:w-auto"
-                >
-                  <CircleHelp className="h-3.5 w-3.5" />
-                  Ayuda
-                </button>
+                <div className='mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage('accounts')}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-accent w-full sm:w-auto"
+                  >
+                    Cambiar cuenta
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage('help')}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-accent w-full sm:w-auto"
+                  >
+                    <CircleHelp className="h-3.5 w-3.5" />
+                    Ayuda
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

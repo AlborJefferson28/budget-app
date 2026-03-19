@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  ArrowRightLeft,
   BookOpen,
   CircleHelp,
   LayoutDashboard,
@@ -35,19 +34,8 @@ const GUIDE_SECTIONS = [
     steps: [
       'Crea al menos una billetera (por ejemplo: Sueldo, Ahorro).',
       'Edita saldo inicial y nombre cuando lo necesites.',
+      'Cuando tengas más de una, usa el botón de transferir en cada tarjeta para mover dinero entre billeteras.',
       'Abre el detalle para ver transacciones recientes de esa billetera.',
-    ],
-  },
-  {
-    id: 'transactions',
-    title: 'Transacciones',
-    icon: ArrowRightLeft,
-    description: 'Registra ingresos, gastos y transferencias entre billeteras.',
-    page: 'transactions',
-    steps: [
-      'Selecciona billetera origen y destino.',
-      'Ingresa el monto en COP y valida la vista previa.',
-      'Usa filtros para revisar historial por tipo de movimiento.',
     ],
   },
   {
@@ -104,7 +92,7 @@ const QUICK_START = [
   '1) Ve a Cuentas y selecciona tu cuenta activa.',
   '2) Crea 1 o 2 billeteras iniciales (ej: Sueldo y Ahorro).',
   '3) Crea tus presupuestos principales (ej: Arriendo, Servicios).',
-  '4) Registra transacciones y luego asigna dinero a presupuestos.',
+  '4) Realiza movimientos entre billeteras y luego asigna dinero a presupuestos.',
   '5) Revisa el Panel para controlar progreso y actividad.',
 ];
 

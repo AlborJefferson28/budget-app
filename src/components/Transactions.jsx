@@ -20,6 +20,11 @@ const normalizeCOPAmount = (value) => {
   return Math.max(0, Math.round(parsed))
 }
 
+const getErrorMessage = (error, fallback) => {
+  if (!error) return fallback
+  return error.message || fallback
+}
+
 export default function Transactions({ accountId, setPage }) {
   const { user } = useAuth()
   const { accounts } = useAccounts()
@@ -41,6 +46,7 @@ export default function Transactions({ accountId, setPage }) {
     [accounts, accountId]
   )
   const isSharedContext = activeAccount?.kind === 'shared' || activeAccount?.owner_id !== user?.id
+  const isContributorContext = isSharedContext && activeAccount?.owner_id !== user?.id
 
   const originWalletOptions = useMemo(() => {
     const activeOptions = wallets.map(wallet => ({
@@ -58,12 +64,32 @@ export default function Transactions({ accountId, setPage }) {
   }, [wallets, personalSourceWallets, activeAccount?.name])
 
   const destinationWalletOptions = wallets
+  const selectedFromWallet = useMemo(
+    () => originWalletOptions.find(wallet => wallet.id === formData.from_wallet) || null,
+    [originWalletOptions, formData.from_wallet]
+  )
+  const selectedToWallet = useMemo(
+    () => destinationWalletOptions.find(wallet => wallet.id === formData.to_wallet) || null,
+    [destinationWalletOptions, formData.to_wallet]
+  )
+  const previewTransactionAmount = useMemo(
+    () => normalizeCOPAmount(amountInput),
+    [amountInput]
+  )
+  const previewAvailableBalance = useMemo(() => {
+    if (!selectedFromWallet) return null
+    let available = normalizeCOPAmount(selectedFromWallet.balance)
+    if (editing && editing.type !== 'income' && editing.from_wallet === selectedFromWallet.id) {
+      available += normalizeCOPAmount(editing.amount)
+    }
+    return available
+  }, [selectedFromWallet, editing])
 
   useEffect(() => {
     if (!showForm) return
 
     const loadPersonalWallets = async () => {
-      if (!isSharedContext) {
+      if (!isContributorContext) {
         setPersonalSourceWallets([])
         setSourceLoading(false)
         return
@@ -109,7 +135,7 @@ export default function Transactions({ accountId, setPage }) {
     }
 
     loadPersonalWallets()
-  }, [showForm, isSharedContext, accounts, user?.id, accountId])
+  }, [showForm, isContributorContext, accounts, user?.id, accountId])
 
   useEffect(() => {
     if (!showForm || editing) return
@@ -151,21 +177,50 @@ export default function Transactions({ accountId, setPage }) {
       return
     }
 
-    if (editing) {
-      await updateTransaction(editing.id, { ...formData, amount })
-      setEditing(null)
-    } else {
-      const fromWallet = originWalletOptions.find(wallet => wallet.id === formData.from_wallet)
-      const toWallet = destinationWalletOptions.find(wallet => wallet.id === formData.to_wallet)
+    const fromWallet = originWalletOptions.find(wallet => wallet.id === formData.from_wallet)
+    const toWallet = destinationWalletOptions.find(wallet => wallet.id === formData.to_wallet)
 
-      if (!fromWallet || !toWallet) {
-        setFormError('Selecciona wallets válidas de origen y destino.')
-        return
+    if (!fromWallet || !toWallet) {
+      setFormError('Selecciona wallets válidas de origen y destino.')
+      return
+    }
+
+    if (formData.type === 'transfer' && fromWallet.id === toWallet.id) {
+      setFormError('La billetera origen y destino deben ser diferentes.')
+      return
+    }
+
+    const requiresFundsValidation = formData.type !== 'income'
+    if (requiresFundsValidation) {
+      let availableBalance = normalizeCOPAmount(fromWallet.balance)
+
+      if (editing && editing.type !== 'income' && editing.from_wallet === fromWallet.id) {
+        // Al editar, se considera que el monto anterior puede liberarse.
+        availableBalance += normalizeCOPAmount(editing.amount)
       }
 
+      if (amount > availableBalance) {
+        setFormError(`Saldo insuficiente en billetera origen. Disponible: ${formatCOP(availableBalance)}.`)
+        return
+      }
+    }
+
+    if (editing) {
+      const { error: updateError } = await updateTransaction(editing.id, { ...formData, amount })
+      if (updateError) {
+        setFormError(getErrorMessage(updateError, 'No fue posible actualizar la transacción.'))
+        return
+      }
+      setEditing(null)
+    } else {
       const isCrossAccountContribution = fromWallet.account_id !== accountId && toWallet.account_id === accountId
 
       if (isCrossAccountContribution) {
+        if (!isContributorContext) {
+          setFormError('Solo los contribuyentes pueden aportar fondos desde cuentas personales.')
+          return
+        }
+
         const { error: contributionError } = await accountTransfersService.contributeToSharedAccount({
           fromWalletId: fromWallet.id,
           toWalletId: toWallet.id,
@@ -174,13 +229,17 @@ export default function Transactions({ accountId, setPage }) {
         })
 
         if (contributionError) {
-          setFormError(contributionError.message || 'No fue posible procesar el aporte entre cuentas.')
+          setFormError(getErrorMessage(contributionError, 'No fue posible procesar el aporte entre cuentas.'))
           return
         }
 
         await Promise.all([refetchTransactions(), refetchWallets()])
       } else {
-        await createTransaction({ ...formData, amount })
+        const { error: createError } = await createTransaction({ ...formData, amount })
+        if (createError) {
+          setFormError(getErrorMessage(createError, 'No fue posible crear la transacción.'))
+          return
+        }
       }
     }
 
@@ -216,13 +275,8 @@ export default function Transactions({ accountId, setPage }) {
   }
 
   const getWalletName = (walletId) => {
-    if (!walletId) return ''
-    return wallets.find(wallet => wallet.id === walletId)?.name || shortWalletId(walletId)
-  }
-
-  const shortWalletId = (walletId) => {
-    if (!walletId) return ''
-    return `${walletId.slice(0, 6)}...${walletId.slice(-4)}`
+    if (!walletId) return 'Billetera'
+    return wallets.find(wallet => wallet.id === walletId)?.name || 'Billetera'
   }
 
   const filteredTransactions = transactions.filter(transaction => {
@@ -358,7 +412,7 @@ export default function Transactions({ accountId, setPage }) {
                   </div>
                 )}
 
-                {isSharedContext && personalSourceWallets.length > 0 && (
+                {isContributorContext && personalSourceWallets.length > 0 && (
                   <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
                     Puedes usar wallets personales como origen para aportar a esta cuenta compartida.
                   </div>
@@ -415,6 +469,7 @@ export default function Transactions({ accountId, setPage }) {
                 </Select>
                 <Input
                   type="text"
+                  numeric
                   placeholder="Monto"
                   value={amountInput}
                   onFocus={() => {
@@ -466,6 +521,16 @@ export default function Transactions({ accountId, setPage }) {
                 <p className="text-xs text-muted-foreground">
                   Vista previa: <span className="font-semibold text-foreground">{formatCOP(normalizeCOPAmount(amountInput))}</span>
                 </p>
+                {formData.type !== 'income' && previewAvailableBalance !== null && previewTransactionAmount > previewAvailableBalance && (
+                  <p className="text-xs text-destructive">
+                    Advertencia: saldo insuficiente en billetera origen. Disponible: {formatCOP(previewAvailableBalance)}.
+                  </p>
+                )}
+                {formData.type === 'transfer' && selectedFromWallet && selectedToWallet && selectedFromWallet.id === selectedToWallet.id && (
+                  <p className="text-xs text-destructive">
+                    Advertencia: origen y destino deben ser diferentes.
+                  </p>
+                )}
                 <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                   <SelectTrigger>
                     <SelectValue />

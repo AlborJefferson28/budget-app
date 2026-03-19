@@ -1,22 +1,31 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useWallets } from '../hooks/useWallets'
+import { useTransactions } from '../hooks/useTransactions'
+import { useAllocations } from '../hooks/useAllocations'
+import { useAuth } from '../contexts/AuthContext'
+import { accountTransfersService, transactionsService } from '../services'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
-import { Search, Plus, Edit, Trash2 } from 'lucide-react'
+import { Select, SelectContent, SelectEmpty, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
+import { Search, Plus, Edit, Trash2, ArrowRightLeft } from 'lucide-react'
 import WalletDetail from './WalletDetail'
 import { formatCOP, parseCOP } from '../lib/currency'
 import { IconGlyph, WALLET_ICON_OPTIONS, normalizeIconKey } from '../lib/icons'
 import { WalletsSkeleton } from './RouteSkeletons'
 
 const QUICK_BALANCE_STEPS = [10000, 50000, 100000]
+const QUICK_TRANSFER_STEPS = [10000, 50000, 100000]
 
 const normalizeCOPAmount = (value) => {
   const parsed = parseCOP(value)
   return Math.max(0, Math.round(parsed))
 }
 
-export default function Wallets({ accountId, setPage }) {
+export default function Wallets({ accountId, setPage, selectedWalletId = null, onClearSelectedWallet }) {
+  const { user } = useAuth()
+  const { transactions } = useTransactions(accountId)
+  const { allocations } = useAllocations(accountId)
   const { wallets, loading, error, createWallet, updateWallet, deleteWallet, refetch } = useWallets(accountId)
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ name: '', icon: 'wallet', balance: 0 })
@@ -24,6 +33,53 @@ export default function Wallets({ accountId, setPage }) {
   const [editing, setEditing] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedWallet, setSelectedWallet] = useState(null)
+  const [accountTransfers, setAccountTransfers] = useState([])
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferForm, setTransferForm] = useState({ from_wallet: '', to_wallet: '', amount: '0' })
+  const [transferAdjustMode, setTransferAdjustMode] = useState('add')
+  const [transferSubmitting, setTransferSubmitting] = useState(false)
+  const [transferError, setTransferError] = useState('')
+
+  useEffect(() => {
+    if (!selectedWalletId) return
+    const targetWallet = wallets.find(wallet => wallet.id === selectedWalletId)
+    if (targetWallet) {
+      setSelectedWallet(targetWallet)
+      onClearSelectedWallet?.()
+    }
+  }, [selectedWalletId, wallets, onClearSelectedWallet])
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadAccountTransfers = async () => {
+      if (!accountId || wallets.length === 0) {
+        setAccountTransfers([])
+        return
+      }
+
+      const walletIds = new Set(wallets.map(wallet => wallet.id))
+      const { data, error: transferErrorLoad } = await accountTransfersService.getRecent(400)
+      if (isCancelled) return
+
+      if (transferErrorLoad) {
+        setAccountTransfers([])
+        return
+      }
+
+      const relatedTransfers = (data || []).filter(transfer =>
+        walletIds.has(transfer.from_wallet_id) || walletIds.has(transfer.to_wallet_id)
+      )
+
+      setAccountTransfers(relatedTransfers)
+    }
+
+    loadAccountTransfers()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [accountId, wallets])
 
   const openCreateForm = () => {
     setEditing(null)
@@ -76,10 +132,144 @@ export default function Wallets({ accountId, setPage }) {
     return { error: null }
   }
 
+  const canTransferBetweenWallets = wallets.length > 1
+  const selectedSourceWallet = useMemo(
+    () => wallets.find(wallet => wallet.id === transferForm.from_wallet) || null,
+    [wallets, transferForm.from_wallet]
+  )
+  const previewTransferAmount = useMemo(
+    () => normalizeCOPAmount(transferForm.amount),
+    [transferForm.amount]
+  )
+
+  const openTransferModal = (fromWalletId = '') => {
+    if (!canTransferBetweenWallets) return
+    const sourceWalletId = fromWalletId || wallets[0]?.id || ''
+    const defaultTargetId = wallets.find(wallet => wallet.id !== sourceWalletId)?.id || ''
+
+    setTransferError('')
+    setTransferForm({
+      from_wallet: sourceWalletId,
+      to_wallet: defaultTargetId,
+      amount: '0',
+    })
+    setShowTransferModal(true)
+  }
+
+  const closeTransferModal = () => {
+    setShowTransferModal(false)
+    setTransferAdjustMode('add')
+    setTransferSubmitting(false)
+    setTransferError('')
+    setTransferForm({ from_wallet: '', to_wallet: '', amount: '0' })
+  }
+
+  const applyTransferQuickAmount = (delta) => {
+    const nextValue = Math.max(0, normalizeCOPAmount(transferForm.amount) + delta)
+    setTransferForm(prev => ({ ...prev, amount: String(nextValue) }))
+  }
+
+  const applyTransferStepByMode = (step) => {
+    const sign = transferAdjustMode === 'add' ? 1 : -1
+    applyTransferQuickAmount(step * sign)
+  }
+
+  const handleTransferSubmit = async (e) => {
+    e.preventDefault()
+    setTransferError('')
+
+    const amount = normalizeCOPAmount(transferForm.amount)
+    if (amount <= 0) {
+      setTransferError('Ingresa un monto válido mayor a 0.')
+      return
+    }
+
+    const sourceWallet = wallets.find(wallet => wallet.id === transferForm.from_wallet)
+    const targetWallet = wallets.find(wallet => wallet.id === transferForm.to_wallet)
+
+    if (!sourceWallet || !targetWallet) {
+      setTransferError('Selecciona billeteras válidas para origen y destino.')
+      return
+    }
+
+    if (sourceWallet.id === targetWallet.id) {
+      setTransferError('La billetera de origen y destino deben ser diferentes.')
+      return
+    }
+
+    if (!accountId) {
+      setTransferError('No hay una cuenta activa para registrar la transferencia.')
+      return
+    }
+
+    const sourceBalance = normalizeCOPAmount(sourceWallet.balance)
+    if (amount > sourceBalance) {
+      setTransferError(`Saldo insuficiente en la billetera origen. Disponible: ${formatCOP(sourceBalance)}.`)
+      return
+    }
+
+    setTransferSubmitting(true)
+    const { error: transactionError } = await transactionsService.create({
+      account_id: accountId,
+      from_wallet: sourceWallet.id,
+      to_wallet: targetWallet.id,
+      amount,
+      type: 'transfer',
+      created_by: user?.id || null,
+    })
+
+    if (transactionError) {
+      setTransferError(transactionError.message || 'No fue posible registrar la transferencia.')
+      setTransferSubmitting(false)
+      return
+    }
+
+    await refetch()
+    setTransferSubmitting(false)
+    closeTransferModal()
+  }
+
   const filteredWallets = wallets.filter(wallet => {
     const matchesSearch = wallet.name.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesSearch
   })
+
+  const quotaStatsByWalletId = useMemo(() => {
+    const stats = {}
+    wallets.forEach((wallet) => {
+      const baseAmount = normalizeCOPAmount(wallet.balance)
+      stats[wallet.id] = { spent: 0, baseAmount, remaining: baseAmount }
+    })
+
+    transactions.forEach((transaction) => {
+      const isOutgoingMoney =
+        transaction.from_wallet &&
+        (transaction.type === 'expense' || transaction.type === 'transfer')
+
+      if (isOutgoingMoney && stats[transaction.from_wallet]) {
+        stats[transaction.from_wallet].spent += normalizeCOPAmount(transaction.amount)
+      }
+    })
+
+    allocations.forEach((allocation) => {
+      if (allocation.wallet_id && stats[allocation.wallet_id]) {
+        stats[allocation.wallet_id].spent += normalizeCOPAmount(allocation.amount)
+      }
+    })
+
+    accountTransfers.forEach((transfer) => {
+      if (transfer.from_wallet_id && stats[transfer.from_wallet_id]) {
+        stats[transfer.from_wallet_id].spent += normalizeCOPAmount(transfer.amount)
+      }
+    })
+
+    Object.keys(stats).forEach((walletId) => {
+      const baseAmount = stats[walletId].baseAmount || 0
+      stats[walletId].remaining = Math.max(baseAmount - stats[walletId].spent, 0)
+    })
+
+    return stats
+  }, [wallets, transactions, allocations, accountTransfers])
 
   if (loading) return <WalletsSkeleton />
   if (error) return <div className="text-destructive">Error: {error.message}</div>
@@ -88,7 +278,7 @@ export default function Wallets({ accountId, setPage }) {
     return (
       <WalletDetail
         wallet={selectedWallet}
-        onBack={() => { setSelectedWallet(null); refetch(); }}
+        onBack={() => { setSelectedWallet(null); onClearSelectedWallet?.(); refetch(); }}
         onDelete={handleDelete}
         updateWallet={updateWallet}
       />
@@ -140,7 +330,31 @@ export default function Wallets({ accountId, setPage }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-primary mb-4">{formatCOP(wallet.balance)}</p>
+              {(() => {
+                const stats = quotaStatsByWalletId[wallet.id] || {
+                  spent: 0,
+                  baseAmount: normalizeCOPAmount(wallet.balance),
+                  remaining: normalizeCOPAmount(wallet.balance),
+                }
+                return (
+                  <>
+                    <div className="mb-4 rounded-lg border border-border bg-muted/40 p-3">
+                      <p className="text-xs text-muted-foreground">Monto base</p>
+                      <p className="text-2xl font-bold text-foreground">{formatCOP(stats.baseAmount)}</p>
+                    </div>
+                    <div className="mb-4 grid grid-cols-2 gap-2">
+                      <div className="rounded-lg border border-border bg-muted/20 p-2.5">
+                        <p className="text-[11px] text-muted-foreground">Gastado</p>
+                        <p className="text-sm font-semibold text-destructive">{formatCOP(stats.spent)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/20 p-2.5">
+                        <p className="text-[11px] text-muted-foreground">Restante</p>
+                        <p className="text-sm font-semibold text-primary">{formatCOP(stats.remaining)}</p>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEdit(wallet); }}>
                   <Edit className="w-4 h-4 mr-1" />
@@ -156,11 +370,197 @@ export default function Wallets({ accountId, setPage }) {
                   <Trash2 className="w-4 h-4 mr-1" />
                   Eliminar
                 </Button>
+                {canTransferBetweenWallets && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openTransferModal(wallet.id)
+                    }}
+                  >
+                    <ArrowRightLeft className="w-4 h-4 mr-1" />
+                    Transferir
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {showTransferModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Transferir entre billeteras</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleTransferSubmit} className="space-y-4">
+                {transferError && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {transferError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Billetera origen</label>
+                  <Select
+                    value={transferForm.from_wallet}
+                    onValueChange={(value) => {
+                      setTransferForm((prev) => {
+                        const nextTarget = prev.to_wallet === value
+                          ? wallets.find(wallet => wallet.id !== value)?.id || ''
+                          : prev.to_wallet
+                        return { ...prev, from_wallet: value, to_wallet: nextTarget }
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar origen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wallets.length === 0 ? (
+                        <SelectEmpty>No hay billeteras disponibles</SelectEmpty>
+                      ) : (
+                        wallets.map((wallet) => (
+                          <SelectItem key={wallet.id} value={wallet.id}>
+                            <div className="flex items-center gap-2">
+                              <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
+                              <span>{wallet.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Billetera destino</label>
+                  <Select
+                    value={transferForm.to_wallet}
+                    onValueChange={(value) => setTransferForm(prev => ({ ...prev, to_wallet: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wallets.length === 0 ? (
+                        <SelectEmpty>No hay billeteras disponibles</SelectEmpty>
+                      ) : (
+                        wallets.map((wallet) => (
+                          <SelectItem key={wallet.id} value={wallet.id} disabled={wallet.id === transferForm.from_wallet}>
+                            <div className="flex items-center gap-2">
+                              <IconGlyph value={wallet.icon} fallback="wallet" className="h-4 w-4" />
+                              <span>{wallet.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Monto</label>
+                  <Input
+                    type="text"
+                    numeric
+                    placeholder="0"
+                    value={transferForm.amount}
+                    onFocus={() => {
+                      if (transferForm.amount === '0') {
+                        setTransferForm(prev => ({ ...prev, amount: '' }))
+                      }
+                    }}
+                    onChange={(e) => {
+                      const nextValue = e.target.value
+                      if (nextValue === '') {
+                        setTransferForm(prev => ({ ...prev, amount: '' }))
+                        return
+                      }
+                      if (/^[\d.,\s]+$/.test(nextValue)) {
+                        setTransferForm(prev => ({ ...prev, amount: nextValue }))
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!transferForm.amount) {
+                        setTransferForm(prev => ({ ...prev, amount: '0' }))
+                        return
+                      }
+                      setTransferForm(prev => ({ ...prev, amount: String(normalizeCOPAmount(prev.amount)) }))
+                    }}
+                    required
+                  />
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant={transferAdjustMode === 'add' ? 'default' : 'outline'}
+                        size="sm"
+                        className={transferAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                        onClick={() => setTransferAdjustMode('add')}
+                      >
+                        Sumar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={transferAdjustMode === 'subtract' ? 'destructive' : 'outline'}
+                        size="sm"
+                        className={transferAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                        onClick={() => setTransferAdjustMode('subtract')}
+                      >
+                        Restar
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {QUICK_TRANSFER_STEPS.map((quickAmount) => (
+                        <Button
+                          key={`wallet-transfer-step-${quickAmount}`}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={`justify-start ${
+                            transferAdjustMode === 'add'
+                              ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                              : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                          }`}
+                          onClick={() => applyTransferStepByMode(quickAmount)}
+                        >
+                          {transferAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Vista previa: <span className="font-semibold text-foreground">{formatCOP(previewTransferAmount)}</span>
+                  </p>
+                  {selectedSourceWallet && previewTransferAmount > normalizeCOPAmount(selectedSourceWallet.balance) && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Saldo insuficiente en origen. Disponible: {formatCOP(selectedSourceWallet.balance)}.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col-reverse sm:flex-row gap-2">
+                  <Button
+                    type="submit"
+                    className="w-full sm:w-auto"
+                    disabled={transferSubmitting || !canTransferBetweenWallets}
+                  >
+                    {transferSubmitting ? 'Procesando...' : 'Transferir'}
+                  </Button>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeTransferModal}>
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -199,6 +599,7 @@ export default function Wallets({ accountId, setPage }) {
                   <label className="block text-sm font-medium mb-2">Balance inicial (COP)</label>
                   <Input
                     type="text"
+                    numeric
                     placeholder="0"
                     value={balanceInput}
                     onFocus={() => {

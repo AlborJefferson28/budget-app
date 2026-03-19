@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useBudgets } from '../hooks/useBudgets';
 import { useAllocations } from '../hooks/useAllocations';
 import { useAccounts } from '../hooks/useAccounts';
@@ -12,6 +12,7 @@ import { formatCOP, parseCOP } from '../lib/currency';
 import { Trash2 } from 'lucide-react';
 import { BUDGET_ICON_OPTIONS, IconGlyph, normalizeIconKey } from '../lib/icons';
 import { BudgetsSkeleton } from './RouteSkeletons';
+import BudgetDetail from './BudgetDetail';
 
 const TABS = [
   { key: 'active', label: 'Metas activas' },
@@ -50,7 +51,7 @@ function IconPicker({ value, onChange }) {
   );
 }
 
-export default function Budgets({ accountId, setPage }) {
+export default function Budgets({ accountId, setPage, selectedBudgetId, onClearSelectedBudget }) {
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const { budgets, loading: budgetsLoading, error: budgetsError, createBudget, updateBudget, deleteBudget } = useBudgets(accountId);
@@ -59,14 +60,26 @@ export default function Budgets({ accountId, setPage }) {
   const [formData, setFormData] = useState({ name: '', target: 0, icon: 'piggy-bank' });
   const [targetInput, setTargetInput] = useState('0');
   const [editing, setEditing] = useState(null);
+  const [selectedBudget, setSelectedBudget] = useState(null);
   const [activeTab, setActiveTab] = useState('active');
+  const [formError, setFormError] = useState('');
 
   const openCreateForm = () => {
     setEditing(null);
+    setFormError('');
     setFormData({ name: '', target: 0, icon: 'piggy-bank' });
     setTargetInput('0');
     setShowForm(true);
   };
+
+  useEffect(() => {
+    if (!selectedBudgetId) return;
+    const matchedBudget = budgets.find((budget) => budget.id === selectedBudgetId);
+    if (matchedBudget) {
+      setSelectedBudget(matchedBudget);
+      onClearSelectedBudget?.();
+    }
+  }, [selectedBudgetId, budgets, onClearSelectedBudget]);
 
   // Simulación de estados para demo visual
   const getBudgetStatus = (budget) => {
@@ -78,9 +91,28 @@ export default function Budgets({ accountId, setPage }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError('');
+    const normalizedTarget = normalizeCOPAmount(targetInput);
+
+    if (normalizedTarget <= 0) {
+      setFormError('El objetivo del presupuesto debe ser mayor a 0.');
+      return;
+    }
+
+    if (editing) {
+      const currentAssigned = allocations
+        .filter((allocation) => allocation.budget_id === editing.id)
+        .reduce((sum, allocation) => sum + (allocation.amount || 0), 0);
+
+      if (normalizedTarget < currentAssigned) {
+        setFormError(`El objetivo no puede ser menor a lo ya asignado (${formatCOP(currentAssigned)}).`);
+        return;
+      }
+    }
+
     const dataToSubmit = {
       ...formData,
-      target: normalizeCOPAmount(targetInput),
+      target: normalizedTarget,
       icon: normalizeIconKey(formData.icon, 'piggy-bank')
     };
     if (editing) {
@@ -101,6 +133,7 @@ export default function Budgets({ accountId, setPage }) {
 
   const handleEdit = (budget) => {
     setEditing(budget);
+    setFormError('');
     const iconKey = normalizeIconKey(budget.icon, 'piggy-bank');
     setFormData({ name: budget.name, target: budget.target, icon: iconKey });
     setTargetInput(String(normalizeCOPAmount(budget.target)));
@@ -160,6 +193,27 @@ export default function Budgets({ accountId, setPage }) {
   if (budgetsLoading || allocationsLoading) return <BudgetsSkeleton />;
   if (budgetsError) return <div className="p-8 text-destructive">Error: {budgetsError.message}</div>;
 
+  if (selectedBudget) {
+    const budgetWithProgress = budgetsWithProgress.find((budget) => budget.id === selectedBudget.id) || selectedBudget;
+    const budgetAllocations = allocations.filter((allocation) => allocation.budget_id === selectedBudget.id);
+
+    return (
+      <BudgetDetail
+        budget={budgetWithProgress}
+        allocations={budgetAllocations}
+        onBack={() => {
+          setSelectedBudget(null);
+          onClearSelectedBudget?.();
+        }}
+        onEdit={() => {
+          setSelectedBudget(null);
+          onClearSelectedBudget?.();
+          handleEdit(budgetWithProgress);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
@@ -191,7 +245,19 @@ export default function Budgets({ accountId, setPage }) {
         {visibleBudgets.map((budget, idx) => {
           const status = getBudgetStatus(budget);
           return (
-            <Card key={budget.id || idx} className="relative group">
+            <Card
+              key={budget.id || idx}
+              className="relative group cursor-pointer transition hover:border-primary/40"
+              onClick={() => setSelectedBudget(budget)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedBudget(budget);
+                }
+              }}
+            >
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconGlyph value={budget.icon} fallback="piggy-bank" className="h-5 w-5" />
@@ -217,8 +283,8 @@ export default function Budgets({ accountId, setPage }) {
                     <span className="font-bold text-base">{formatCOP(budget.current)} / {formatCOP(budget.target)}</span>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleEdit(budget)}>Editar</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDelete(budget.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive">
+                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleEdit(budget); }}>Editar</Button>
+                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleDelete(budget.id); }} className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive">
                       Eliminar
                     </Button>
                   </div>
@@ -247,6 +313,11 @@ export default function Budgets({ accountId, setPage }) {
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h3>
+            {formError && (
+              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {formError}
+              </div>
+            )}
             <div className="mb-4">
               <label className="block text-sm mb-1">Nombre</label>
               <Input
@@ -261,6 +332,7 @@ export default function Budgets({ accountId, setPage }) {
               <label className="block text-sm mb-1">Objetivo</label>
               <Input
                 type="text"
+                numeric
                 placeholder="Objetivo"
                 value={targetInput}
                 onFocus={() => {
@@ -331,7 +403,7 @@ export default function Budgets({ accountId, setPage }) {
                 </Button>
               )}
               <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormData({ name: '', target: 0, icon: 'piggy-bank' }); setTargetInput('0'); }}>Cancelar</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ name: '', target: 0, icon: 'piggy-bank' }); setTargetInput('0'); }}>Cancelar</Button>
             </div>
           </form>
         </div>

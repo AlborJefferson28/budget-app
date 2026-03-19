@@ -9,7 +9,7 @@ const STEPS = [
   {
     id: 'welcome',
     title: 'Bienvenido',
-    description: 'Esta app te ayuda a organizar dinero por cuentas, billeteras, transacciones y presupuestos.',
+    description: 'Esta app te ayuda a organizar dinero por cuentas, billeteras, movimientos y presupuestos.',
   },
   {
     id: 'accounts',

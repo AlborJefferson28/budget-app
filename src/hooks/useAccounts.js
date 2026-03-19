@@ -123,5 +123,6 @@ export const useAccounts = () => {
     updateAccount,
     deleteAccount,
     refetch: fetchAccounts,
+    notifyAccountsChanged: emitAccountsChanged,
   }
 }

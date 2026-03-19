@@ -76,6 +76,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
     .filter(a => new Date(a.created_at).getMonth() === currentMonth && new Date(a.created_at).getFullYear() === currentYear)
     .reduce((sum, a) => sum + a.amount, 0)
   const monthlySpending = monthlyExpenseTransactions + monthlyBudgetAllocations
+  const globalRemaining = totalBalance - monthlySpending
 
   // Calcular progreso de budgets (asumiendo allocations como spent)
   const budgetProgress = budgets.map(budget => {
@@ -85,12 +86,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
     return { ...budget, spent, progress: budget.target > 0 ? (spent / budget.target) * 100 : 0 }
   })
 
-  const shortId = (id) => {
-    if (!id) return ''
-    return `${id.slice(0, 6)}...${id.slice(-4)}`
-  }
-
-  const getWalletName = (walletId) => walletNameById[walletId] || shortId(walletId)
+  const getWalletName = (walletId, fallback = 'Billetera') => walletNameById[walletId] || fallback
 
   const transactionEvents = transactions.map(transaction => {
     const typeLabel = transaction.type === 'transfer'
@@ -120,7 +116,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
       date: transfer.created_at,
       type: 'account_transfer',
       title: 'Aporte entre cuentas',
-      subtitle: `${shortId(transfer.from_wallet_id)} -> ${shortId(transfer.to_wallet_id)}`,
+      subtitle: `${getWalletName(transfer.from_wallet_id, 'Billetera origen')} -> ${getWalletName(transfer.to_wallet_id, 'Billetera destino')}`,
       amount: transfer.amount,
       amountStyle: isIncoming ? 'text-primary' : 'text-destructive',
       amountPrefix: isIncoming ? '+' : '-',
@@ -132,7 +128,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
     date: allocation.created_at,
     type: 'allocation',
     title: 'Asignación a presupuesto',
-    subtitle: `${allocation.wallets?.name || shortId(allocation.wallet_id)} -> ${allocation.budgets?.name || shortId(allocation.budget_id)}`,
+    subtitle: `${allocation.wallets?.name || 'Billetera'} -> ${allocation.budgets?.name || 'Presupuesto'}`,
     amount: allocation.amount,
     amountStyle: 'text-primary',
     amountPrefix: '-',
@@ -159,11 +155,11 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
             </div>
           </div>
           <button
-            onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('transactions') } }}
+            onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('wallets') } }}
             className="w-full sm:w-auto bg-primary text-primary-foreground px-4 py-2.5 rounded-lg flex items-center justify-center space-x-2 hover:bg-primary/90 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>Nueva Transacción</span>
+            <span>Mover entre billeteras</span>
           </button>
         </div>
       </div>
@@ -172,7 +168,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
         {/* Contenido principal */}
         <div className="lg:col-span-2 space-y-6">
           {/* Tarjetas de resumen */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-card border border-border p-6 rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
@@ -193,6 +189,20 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                 </div>
                 <div className="w-12 h-12 bg-destructive/15 rounded-full flex items-center justify-center">
                   <TrendingUp className="w-6 h-6 text-destructive" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-card border border-border p-6 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Restante global</p>
+                  <p className={`text-2xl font-bold ${globalRemaining >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                    {formatCOP(globalRemaining)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Balance total - gasto mensual</p>
+                </div>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${globalRemaining >= 0 ? 'bg-primary/15' : 'bg-destructive/15'}`}>
+                  <Target className={`w-6 h-6 ${globalRemaining >= 0 ? 'text-primary' : 'text-destructive'}`} />
                 </div>
               </div>
             </div>
@@ -233,7 +243,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
             <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-lg font-semibold text-foreground">Actividad Reciente</h2>
               <button
-                onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('transactions') } }}
+                onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('wallets') } }}
                 className="text-primary text-sm flex items-center space-x-1 hover:text-primary/80 shrink-0"
               >
                 <span>Ver todas</span>
