@@ -243,6 +243,8 @@ export default function Transactions({ accountId, setPage }) {
           setFormError(getErrorMessage(createError, 'No fue posible crear la transacción.'))
           return
         }
+
+        await refetchWallets()
       }
     }
 

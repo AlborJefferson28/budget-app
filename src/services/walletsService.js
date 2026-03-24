@@ -6,6 +6,7 @@ export const walletsService = {
       .from('wallets')
       .select('*')
       .eq('account_id', accountId)
+      .is('deleted_at', null)
     return { data, error }
   },
 
@@ -27,13 +28,12 @@ export const walletsService = {
   },
 
   async delete(id) {
-    const response = await supabase
+    const { data, error } = await supabase
       .from('wallets')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
+      .select()
 
-    // Supabase returns 204 (No Content) on successful deletion
-    // In this case, error is null and data is null, which is success
-    return { error: response.error, success: !response.error }
+    return { data, error }
   },
 }

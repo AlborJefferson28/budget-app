@@ -19,7 +19,7 @@ const QUICK_TRANSFER_STEPS = [10000, 50000, 100000]
 
 export default function Wallets({ accountId, setPage, selectedWalletId = null, onClearSelectedWallet }) {
   const { user } = useAuth()
-  const { transactions } = useTransactions(accountId)
+  const { transactions, refetch: refetchTransactions } = useTransactions(accountId)
   const { allocations } = useAllocations(accountId)
   const { wallets, loading, error, createWallet, updateWallet, deleteWallet, refetch } = useWallets(accountId)
   const [showForm, setShowForm] = useState(false)
@@ -228,7 +228,7 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
       return
     }
 
-    await refetch()
+    await Promise.all([refetch(), refetchTransactions()])
     setTransferSubmitting(false)
     closeTransferModal()
   }

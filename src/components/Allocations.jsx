@@ -427,11 +427,8 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                   </div>
                   <p className="text-xs text-muted-foreground">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</p>
                 </div>
-                <div className="flex gap-2 pt-1">
-                  <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${getAllocationType(allocation.amount, averageAllocation).color}`}>
-                    {getAllocationType(allocation.amount, averageAllocation).label}
-                  </span>
-                  <Button size="sm" variant="outline" onClick={() => handleViewAllocation(allocation)} className="flex-1">Ver movimiento</Button>
+                <div className="pt-1">
+                  <Button size="sm" variant="outline" onClick={() => handleViewAllocation(allocation)} className="w-full">Ver movimiento</Button>
                 </div>
               </div>
             ))}
@@ -447,7 +444,6 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                   <th className="py-3 px-6 text-left font-semibold">BILLETERA ORIGEN</th>
                   <th className="py-3 px-6 text-left font-semibold">PRESUPUESTO DESTINO</th>
                   <th className="py-3 px-6 text-left font-semibold">MONTO</th>
-                  <th className="py-3 px-6 text-left font-semibold">TIPO</th>
                   <th className="py-3 px-6 text-left font-semibold">FECHA</th>
                   <th className="py-3 px-6 text-left font-semibold">ESTADO</th>
                   <th className="py-3 px-6 text-left font-semibold">MOVIMIENTO</th>
@@ -486,11 +482,6 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                       </button>
                     </td>
                     <td className="py-3 px-6 font-bold">{formatCOP(allocation.amount)}</td>
-                    <td className="py-3 px-6">
-                      <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getAllocationType(allocation.amount, averageAllocation).color}`}>
-                        {getAllocationType(allocation.amount, averageAllocation).label}
-                      </span>
-                    </td>
                     <td className="py-3 px-6">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</td>
                     <td className="py-3 px-6">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
@@ -503,7 +494,7 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                   </tr>
                 ))}
                 {paged.length === 0 && (
-                  <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No se encontraron asignaciones.</td></tr>
+                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No se encontraron asignaciones.</td></tr>
                 )}
               </tbody>
             </table>
@@ -754,12 +745,6 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
               <div>
                 <p className="text-xs text-muted-foreground">Monto</p>
                 <p className="text-lg font-bold text-primary">{formatCOP(viewingAllocation.amount)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Tipo</p>
-                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getAllocationType(viewingAllocation.amount, averageAllocation).color}`}>
-                  {getAllocationType(viewingAllocation.amount, averageAllocation).label}
-                </span>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Fecha</p>

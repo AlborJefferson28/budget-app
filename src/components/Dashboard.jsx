@@ -220,7 +220,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-            <div className="max-h-[300px] overflow-y-auto pr-1 space-y-3">
+            <div className="max-h-[360px] overflow-y-auto pr-1 space-y-3">
               {wallets.length > 0 ? wallets.slice(0, 12).map(wallet => (
                 <div key={wallet.id} className="flex items-center justify-between gap-3 p-3 bg-muted/60 rounded-lg border border-border/60">
                   <div className="flex items-center space-x-3">
@@ -337,7 +337,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-3">
+            <div className="max-h-[360px] overflow-y-auto pr-1 space-y-3">
               {budgetProgress.length > 0 ? budgetProgress.slice(0, 3).map(budget => (
                 <div key={budget.id} className="p-3 bg-muted/60 rounded-lg border border-border/60">
                   <div className="flex items-center justify-between mb-2">
