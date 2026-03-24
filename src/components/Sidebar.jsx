@@ -1,9 +1,35 @@
-import { LayoutDashboard, Wallet, Target, PieChart, Users, Settings, Moon, Sun, CircleHelp } from 'lucide-react'
+import React from 'react'
+import { LayoutDashboard, Wallet, Target, PieChart, Users, Settings, Moon, Sun, CircleHelp, Download } from 'lucide-react'
 import UserCard from './UserCard'
 import { useTheme } from '../contexts/ThemeContext'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 
 export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSelectedAccount, selectedAccount, signOut, accounts, isMobile, user }) {
   const { isDark, toggleTheme } = useTheme()
+  const { needRefresh, updateServiceWorker, offlineReady } = useRegisterSW({
+    onNeedRefresh() {
+      updateServiceWorker(true)
+    },
+  })
+  const [deferredPrompt, setDeferredPrompt] = React.useState(null)
+
+  React.useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null)
+    }
+  }
   const items = [
     { name: 'Panel', page: 'dashboard', icon: LayoutDashboard },
     { name: 'Billeteras', page: 'wallets', icon: Wallet },
@@ -53,7 +79,15 @@ export default function Sidebar({ isOpen, onClose, currentPage, setPage, setSele
             )
           })}
         </nav>
-        <div className="px-4 pb-2">
+        <div className="px-4 pb-2 space-y-2">
+          <button
+            onClick={handleInstall}
+            disabled={!deferredPrompt}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="h-4 w-4" />
+            Agregar acceso directo
+          </button>
           <button
             onClick={toggleTheme}
             className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
