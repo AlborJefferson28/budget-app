@@ -18,7 +18,8 @@ export default function Login({ onSwitchToSignup }) {
   const [keepLoggedIn, setKeepLoggedIn] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn } = useAuth()
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const { signIn, signInWithGoogle } = useAuth()
   const emailRef = useRef(null)
   const passwordRef = useRef(null)
 
@@ -48,6 +49,16 @@ export default function Login({ onSwitchToSignup }) {
       setError(error.message)
     }
     setLoading(false)
+  }
+
+  const handleGoogleSignIn = async () => {
+    setError('')
+    setGoogleLoading(true)
+    const { error: googleError } = await signInWithGoogle()
+    if (googleError) {
+      setError(googleError.message || 'No fue posible iniciar con Google.')
+      setGoogleLoading(false)
+    }
   }
 
   return (
@@ -136,9 +147,15 @@ export default function Login({ onSwitchToSignup }) {
 
             {/* Botones sociales */}
             <div className="space-y-3">
-              <Button disabled variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
+              <Button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading}
+                variant="outline"
+                className="w-full flex items-center justify-center py-3 text-sm"
+              >
                 <Chrome className="w-5 h-5 mr-2" />
-                Continuar con Google
+                {googleLoading ? 'Redirigiendo a Google...' : 'Continuar con Google'}
               </Button>
               <Button disabled variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
                 <Apple className="w-5 h-5 mr-2" />
@@ -146,7 +163,7 @@ export default function Login({ onSwitchToSignup }) {
               </Button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Inicio con Google y Apple estará disponible pronto.
+              Apple estará disponible pronto.
             </p>
             <Button
               type="button"

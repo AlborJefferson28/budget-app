@@ -18,7 +18,8 @@ export default function Signup({ onSwitchToLogin }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signUp, signIn } = useAuth()
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const { signUp, signIn, signInWithGoogle } = useAuth()
   const emailRef = useRef(null)
   const passwordRef = useRef(null)
   const confirmPasswordRef = useRef(null)
@@ -63,6 +64,16 @@ export default function Signup({ onSwitchToLogin }) {
     }
 
     setLoading(false)
+  }
+
+  const handleGoogleSignUp = async () => {
+    setError('')
+    setGoogleLoading(true)
+    const { error: googleError } = await signInWithGoogle()
+    if (googleError) {
+      setError(googleError.message || 'No fue posible registrarse con Google.')
+      setGoogleLoading(false)
+    }
   }
 
   return (
@@ -162,9 +173,15 @@ export default function Signup({ onSwitchToLogin }) {
 
             {/* Botones sociales */}
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button disabled variant="outline" className="w-full text-sm">
+              <Button
+                type="button"
+                onClick={handleGoogleSignUp}
+                disabled={googleLoading || loading}
+                variant="outline"
+                className="w-full text-sm"
+              >
                 <Chrome className="w-5 h-5 mr-2" />
-                Google
+                {googleLoading ? 'Redirigiendo...' : 'Google'}
               </Button>
               <Button disabled variant="outline" className="w-full text-sm">
                 <Apple className="w-5 h-5 mr-2" />
@@ -172,7 +189,7 @@ export default function Signup({ onSwitchToLogin }) {
               </Button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Registro con Google y Apple estará disponible pronto.
+              Registro con Apple estará disponible pronto.
             </p>
             <Button
               type="button"
