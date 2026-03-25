@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Card, CardContent } from '../ui/Card'
-import { Mail, Lock, Eye, EyeOff, Chrome, Apple } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Chrome } from 'lucide-react'
 
 function ErrMsg({ msg }) {
   if (!msg) return null;
@@ -172,25 +172,18 @@ export default function Signup({ onSwitchToLogin }) {
             </div>
 
             {/* Botones sociales */}
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="mt-6">
               <Button
                 type="button"
                 onClick={handleGoogleSignUp}
                 disabled={googleLoading || loading}
                 variant="outline"
-                className="w-full text-sm"
+                className="w-full flex items-center justify-center py-3 text-sm"
               >
                 <Chrome className="w-5 h-5 mr-2" />
-                {googleLoading ? 'Redirigiendo...' : 'Google'}
-              </Button>
-              <Button disabled variant="outline" className="w-full text-sm">
-                <Apple className="w-5 h-5 mr-2" />
-                Apple
+                {googleLoading ? 'Redirigiendo...' : 'Continuar con Google'}
               </Button>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Registro con Apple estará disponible pronto.
-            </p>
             <Button
               type="button"
               onClick={onSwitchToLogin}

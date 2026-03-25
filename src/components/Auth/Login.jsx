@@ -4,7 +4,7 @@ import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Checkbox } from '../ui/Checkbox'
 import { Card, CardContent } from '../ui/Card'
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Chrome, Apple } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Chrome } from 'lucide-react'
 
 function ErrMsg({ msg }) {
   if (!msg) return null;
@@ -157,14 +157,7 @@ export default function Login({ onSwitchToSignup }) {
                 <Chrome className="w-5 h-5 mr-2" />
                 {googleLoading ? 'Redirigiendo a Google...' : 'Continuar con Google'}
               </Button>
-              <Button disabled variant="outline" className="w-full flex items-center justify-center py-3 text-sm">
-                <Apple className="w-5 h-5 mr-2" />
-                Continuar con Apple
-              </Button>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Apple estará disponible pronto.
-            </p>
             <Button
               type="button"
               onClick={onSwitchToSignup}
