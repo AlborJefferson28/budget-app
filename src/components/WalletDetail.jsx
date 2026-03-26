@@ -47,6 +47,13 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
     balanceInput: formatCOPInput(wallet.balance)
   })
 
+  const getTransactionDate = (transaction) => transaction?.occurred_at || transaction?.created_at
+  const toDateMs = (value) => {
+    if (!value) return 0
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime()
+  }
+
   useEffect(() => {
     setCurrentWallet(wallet)
     setEditForm({
@@ -92,7 +99,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
   const walletTransactions = useMemo(() => (
     transactions
       .filter(t => t.from_wallet === currentWallet.id || t.to_wallet === currentWallet.id)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .sort((a, b) => toDateMs(getTransactionDate(b)) - toDateMs(getTransactionDate(a)))
   ), [transactions, currentWallet.id])
 
   const walletAllocations = useMemo(() => (
@@ -163,11 +170,11 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
 
       return {
         id: `tx-${transaction.id}`,
-        date: transaction.created_at,
+        date: getTransactionDate(transaction),
         title,
         subtitle: transaction.type === 'transfer'
           ? 'Movimiento entre billeteras'
-          : 'Transacción de billetera',
+          : `${transaction.category || 'Transacción de billetera'}${transaction.note ? ` · ${transaction.note}` : ''}`,
         amount: normalizeCOPAmount(transaction.amount),
         amountPrefix,
         amountClass,
@@ -201,7 +208,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
     })
 
     return [...transactionEvents, ...allocationEvents, ...accountTransferEvents]
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .sort((a, b) => toDateMs(b.date) - toDateMs(a.date))
   }, [walletTransactions, walletAllocations, walletAccountTransfers, currentWallet.id, currentWallet.name])
 
   const latestActivity = movementHistory[0]?.date || currentWallet.created_at

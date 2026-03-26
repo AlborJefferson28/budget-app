@@ -8,11 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { Select, SelectContent, SelectEmpty, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
-import { Search, Plus, Edit, Trash2, ArrowRightLeft } from 'lucide-react'
+import { Search, Plus, Edit, Trash2, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react'
 import WalletDetail from './WalletDetail'
 import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
 import { IconGlyph, WALLET_ICON_OPTIONS, normalizeIconKey } from '../lib/icons'
 import { WalletsSkeleton } from './RouteSkeletons'
+import WalletMovementModal from './WalletMovementModal'
 
 const QUICK_BALANCE_STEPS = [10000, 50000, 100000]
 const QUICK_TRANSFER_STEPS = [10000, 50000, 100000]
@@ -35,6 +36,7 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
   const [balanceAdjustMode, setBalanceAdjustMode] = useState('add')
   const [transferSubmitting, setTransferSubmitting] = useState(false)
   const [transferError, setTransferError] = useState('')
+  const [movementModal, setMovementModal] = useState({ open: false, type: 'income', walletId: '' })
 
   useEffect(() => {
     if (!selectedWalletId) return
@@ -160,6 +162,18 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
     setShowTransferModal(true)
   }
 
+  const openMovementModal = (type = 'income', walletId = '') => {
+    if (wallets.length === 0) {
+      openCreateForm()
+      return
+    }
+    setMovementModal({ open: true, type, walletId })
+  }
+
+  const closeMovementModal = () => {
+    setMovementModal(prev => ({ ...prev, open: false }))
+  }
+
   const closeTransferModal = () => {
     setShowTransferModal(false)
     setTransferAdjustMode('add')
@@ -219,6 +233,9 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
       to_wallet: targetWallet.id,
       amount,
       type: 'transfer',
+      note: null,
+      category: null,
+      occurred_at: new Date().toISOString(),
       created_by: user?.id || null,
     })
 
@@ -275,6 +292,12 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
     return stats
   }, [wallets, transactions, allocations, accountTransfers])
 
+  const movementCategories = useMemo(() => (
+    transactions
+      .map(transaction => (transaction.category || '').trim())
+      .filter(Boolean)
+  ), [transactions])
+
   if (loading) return <WalletsSkeleton />
   if (error) return <div className="text-destructive">Error: {error.message}</div>
 
@@ -293,10 +316,28 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold">Mis billeteras</h1>
-        <Button onClick={openCreateForm} className="w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva billetera
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => openMovementModal('income')}
+            className="w-full sm:w-auto"
+          >
+            <TrendingUp className="w-4 h-4 mr-2 text-primary" />
+            Registrar ingreso
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => openMovementModal('expense')}
+            className="w-full sm:w-auto"
+          >
+            <TrendingDown className="w-4 h-4 mr-2 text-destructive" />
+            Registrar gasto
+          </Button>
+          <Button onClick={openCreateForm} className="w-full sm:w-auto">
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva billetera
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -534,7 +575,10 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
                   )}
                 </div>
 
-                <div className="flex flex-col-reverse sm:flex-row gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeTransferModal}>
+                    Cancelar
+                  </Button>
                   <Button
                     type="submit"
                     className="w-full sm:w-auto"
@@ -542,15 +586,26 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
                   >
                     {transferSubmitting ? 'Procesando...' : 'Transferir'}
                   </Button>
-                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeTransferModal}>
-                    Cancelar
-                  </Button>
                 </div>
               </form>
             </CardContent>
           </Card>
         </div>
       )}
+
+      <WalletMovementModal
+        open={movementModal.open}
+        onClose={closeMovementModal}
+        accountId={accountId}
+        userId={user?.id || null}
+        wallets={wallets}
+        categories={movementCategories}
+        defaultType={movementModal.type}
+        initialWalletId={movementModal.walletId}
+        onSuccess={async () => {
+          await Promise.all([refetch(), refetchTransactions()])
+        }}
+      />
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -644,12 +699,12 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col-reverse sm:flex-row gap-2">
-                  <Button type="submit" className="w-full sm:w-auto">
-                    {editing ? 'Actualizar' : 'Crear'}
-                  </Button>
+                <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
                   <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={resetForm}>
                     Cancelar
+                  </Button>
+                  <Button type="submit" className="w-full sm:w-auto">
+                    {editing ? 'Actualizar' : 'Crear'}
                   </Button>
                 </div>
               </form>

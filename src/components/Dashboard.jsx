@@ -1,27 +1,46 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { useAccounts } from '../hooks/useAccounts'
 import { useWallets } from '../hooks/useWallets'
 import { useBudgets } from '../hooks/useBudgets'
 import { useTransactions } from '../hooks/useTransactions'
 import { useAllocations } from '../hooks/useAllocations'
 import { accountTransfersService } from '../services'
-import { Wallet, TrendingUp, Plus, ArrowRight, DollarSign, Target, Activity, Lightbulb } from 'lucide-react'
-import { formatCOP } from '../lib/currency'
-import { IconGlyph } from '../lib/icons'
+import { Wallet, TrendingUp, TrendingDown, Plus, ArrowRight, DollarSign, Target, Activity, Lightbulb } from 'lucide-react'
+import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
+import { BUDGET_ICON_OPTIONS, IconGlyph, normalizeIconKey, WALLET_ICON_OPTIONS } from '../lib/icons'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
+import { Button } from './ui/Button'
+import { Input } from './ui/Input'
 import { DashboardSkeleton } from './RouteSkeletons'
+import WalletMovementModal from './WalletMovementModal'
+
+const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
 
 export default function Dashboard({ setPage, setSelectedAccount, accountId: selectedAccountId }) {
+  const { user } = useAuth()
   const { accounts, loading: accountsLoading, error: accountsError } = useAccounts()
 
   // Asumir primera cuenta para mostrar datos
   const accountId = selectedAccountId || (accounts.length > 0 ? accounts[0].id : null)
 
-  const { wallets, loading: walletsLoading } = useWallets(accountId)
-  const { budgets, loading: budgetsLoading } = useBudgets(accountId)
-  const { transactions, loading: transactionsLoading } = useTransactions(accountId)
+  const { wallets, loading: walletsLoading, refetch: refetchWallets, createWallet } = useWallets(accountId)
+  const { budgets, loading: budgetsLoading, createBudget } = useBudgets(accountId)
+  const { transactions, loading: transactionsLoading, refetch: refetchTransactions } = useTransactions(accountId)
   const { allocations, loading: allocationsLoading } = useAllocations(accountId)
   const [recentTransfers, setRecentTransfers] = useState([])
   const [transfersLoading, setTransfersLoading] = useState(false)
+  const [movementModal, setMovementModal] = useState({ open: false, type: 'income', walletId: '' })
+  const [showWalletForm, setShowWalletForm] = useState(false)
+  const [walletFormData, setWalletFormData] = useState({ name: '', icon: 'wallet' })
+  const [walletBalanceInput, setWalletBalanceInput] = useState('0')
+  const [walletBalanceAdjustMode, setWalletBalanceAdjustMode] = useState('add')
+  const [walletFormError, setWalletFormError] = useState('')
+  const [showBudgetForm, setShowBudgetForm] = useState(false)
+  const [budgetFormData, setBudgetFormData] = useState({ name: '', icon: 'piggy-bank' })
+  const [budgetTargetInput, setBudgetTargetInput] = useState('0')
+  const [budgetTargetAdjustMode, setBudgetTargetAdjustMode] = useState('add')
+  const [budgetFormError, setBudgetFormError] = useState('')
 
   useEffect(() => {
     const loadRecentTransfers = async () => {
@@ -57,11 +76,24 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
     return map
   }, [wallets])
 
+  const movementCategories = useMemo(() => (
+    transactions
+      .map(transaction => (transaction.category || '').trim())
+      .filter(Boolean)
+  ), [transactions])
+
   if (accountsLoading || walletsLoading || budgetsLoading || transactionsLoading || allocationsLoading || transfersLoading) {
     return <DashboardSkeleton />
   }
 
   if (accountsError) return <div className="min-h-[60vh] flex items-center justify-center text-destructive">Error: {accountsError.message}</div>
+
+  const getTransactionDate = (transaction) => transaction?.occurred_at || transaction?.created_at
+  const toDateMs = (value) => {
+    if (!value) return 0
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime()
+  }
 
   // Calcular total balance
   const totalBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0)
@@ -70,7 +102,14 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
   const currentMonth = new Date().getMonth()
   const currentYear = new Date().getFullYear()
   const monthlyExpenseTransactions = transactions
-    .filter(t => t.type === 'expense' && new Date(t.created_at).getMonth() === currentMonth && new Date(t.created_at).getFullYear() === currentYear)
+    .filter((t) => {
+      if (t.type !== 'expense') return false
+      const dateValue = getTransactionDate(t)
+      if (!dateValue) return false
+      const txDate = new Date(dateValue)
+      if (Number.isNaN(txDate.getTime())) return false
+      return txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear
+    })
     .reduce((sum, t) => sum + t.amount, 0)
   const monthlyBudgetAllocations = allocations
     .filter(a => new Date(a.created_at).getMonth() === currentMonth && new Date(a.created_at).getFullYear() === currentYear)
@@ -97,12 +136,12 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
 
     return {
       id: `transaction-${transaction.id}`,
-      date: transaction.created_at,
+      date: getTransactionDate(transaction),
       type: 'transaction',
       title: typeLabel,
       subtitle: transaction.type === 'transfer'
         ? `De ${getWalletName(transaction.from_wallet)} a ${getWalletName(transaction.to_wallet)}`
-        : `Wallet: ${getWalletName(transaction.from_wallet || transaction.to_wallet)}`,
+        : `${transaction.category || 'Movimiento'} · ${getWalletName(transaction.from_wallet || transaction.to_wallet)}`,
       amount: transaction.amount,
       amountStyle: transaction.type === 'expense' ? 'text-destructive' : 'text-primary',
       amountPrefix: transaction.type === 'expense' ? '-' : '+',
@@ -135,8 +174,148 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
   }))
 
   const recentActivity = [...transactionEvents, ...transferEvents, ...allocationEvents]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .sort((a, b) => toDateMs(b.date) - toDateMs(a.date))
     .slice(0, 20)
+
+  const openMovementModal = (type = 'income') => {
+    if (!accountId) {
+      setPage('accounts')
+      return
+    }
+    if (wallets.length === 0) {
+      openWalletCreateModal()
+      return
+    }
+    setMovementModal({ open: true, type, walletId: wallets[0]?.id || '' })
+  }
+
+  const closeMovementModal = () => {
+    setMovementModal(prev => ({ ...prev, open: false }))
+  }
+
+  const openWalletCreateModal = () => {
+    if (!accountId) {
+      setPage('accounts')
+      return
+    }
+    setWalletFormData({ name: '', icon: 'wallet' })
+    setWalletBalanceInput('0')
+    setWalletBalanceAdjustMode('add')
+    setWalletFormError('')
+    setShowWalletForm(true)
+  }
+
+  const closeWalletCreateModal = () => {
+    setShowWalletForm(false)
+    setWalletFormError('')
+    setWalletFormData({ name: '', icon: 'wallet' })
+    setWalletBalanceInput('0')
+    setWalletBalanceAdjustMode('add')
+  }
+
+  const openBudgetCreateModal = () => {
+    if (!accountId) {
+      setPage('accounts')
+      return
+    }
+    setBudgetFormData({ name: '', icon: 'piggy-bank' })
+    setBudgetTargetInput('0')
+    setBudgetTargetAdjustMode('add')
+    setBudgetFormError('')
+    setShowBudgetForm(true)
+  }
+
+  const closeBudgetCreateModal = () => {
+    setShowBudgetForm(false)
+    setBudgetFormError('')
+    setBudgetFormData({ name: '', icon: 'piggy-bank' })
+    setBudgetTargetInput('0')
+    setBudgetTargetAdjustMode('add')
+  }
+
+  const applyWalletBalanceQuickAmount = (delta) => {
+    const nextValue = Math.max(0, normalizeCOPAmount(walletBalanceInput) + delta)
+    setWalletBalanceInput(formatCOPInput(nextValue))
+  }
+
+  const applyWalletBalanceStepByMode = (step) => {
+    const sign = walletBalanceAdjustMode === 'add' ? 1 : -1
+    applyWalletBalanceQuickAmount(step * sign)
+  }
+
+  const applyBudgetTargetQuickAmount = (delta) => {
+    const nextValue = Math.max(0, normalizeCOPAmount(budgetTargetInput) + delta)
+    setBudgetTargetInput(formatCOPInput(nextValue))
+  }
+
+  const applyBudgetTargetStepByMode = (step) => {
+    const sign = budgetTargetAdjustMode === 'add' ? 1 : -1
+    applyBudgetTargetQuickAmount(step * sign)
+  }
+
+  const handleWalletCreateSubmit = async (e) => {
+    e.preventDefault()
+    setWalletFormError('')
+
+    if (!accountId) {
+      setWalletFormError('No hay una cuenta activa para crear la billetera.')
+      return
+    }
+
+    const payload = {
+      name: walletFormData.name.trim(),
+      icon: normalizeIconKey(walletFormData.icon, 'wallet'),
+      balance: normalizeCOPAmount(walletBalanceInput),
+    }
+
+    if (!payload.name) {
+      setWalletFormError('El nombre es obligatorio.')
+      return
+    }
+
+    const { error: createError } = await createWallet(payload)
+    if (createError) {
+      setWalletFormError(createError.message || 'No fue posible crear la billetera.')
+      return
+    }
+
+    closeWalletCreateModal()
+  }
+
+  const handleBudgetCreateSubmit = async (e) => {
+    e.preventDefault()
+    setBudgetFormError('')
+
+    if (!accountId) {
+      setBudgetFormError('No hay una cuenta activa para crear el presupuesto.')
+      return
+    }
+
+    const normalizedTarget = normalizeCOPAmount(budgetTargetInput)
+    if (normalizedTarget <= 0) {
+      setBudgetFormError('El objetivo del presupuesto debe ser mayor a 0.')
+      return
+    }
+
+    const payload = {
+      name: budgetFormData.name.trim(),
+      target: normalizedTarget,
+      icon: normalizeIconKey(budgetFormData.icon, 'piggy-bank'),
+    }
+
+    if (!payload.name) {
+      setBudgetFormError('El nombre es obligatorio.')
+      return
+    }
+
+    const { error: createError } = await createBudget(payload)
+    if (createError) {
+      setBudgetFormError(createError.message || 'No fue posible crear el presupuesto.')
+      return
+    }
+
+    closeBudgetCreateModal()
+  }
 
   return (
     <div className="w-full">
@@ -309,14 +488,28 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
             <h3 className="text-lg font-semibold text-foreground mb-4">Acciones rápidas</h3>
             <div className="space-y-3">
               <button
-                onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('wallets') } }}
+                onClick={openWalletCreateModal}
                 className="w-full bg-primary text-primary-foreground px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-primary/90 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nueva billetera</span>
               </button>
               <button
-                onClick={() => { if (accountId) { setSelectedAccount(accountId); setPage('budgets') } }}
+                onClick={() => openMovementModal('income')}
+                className="w-full bg-background text-foreground px-4 py-3 rounded-lg flex items-center justify-center space-x-2 border border-border hover:bg-accent transition-colors"
+              >
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <span>Registrar ingreso</span>
+              </button>
+              <button
+                onClick={() => openMovementModal('expense')}
+                className="w-full bg-background text-foreground px-4 py-3 rounded-lg flex items-center justify-center space-x-2 border border-border hover:bg-accent transition-colors"
+              >
+                <TrendingDown className="w-4 h-4 text-destructive" />
+                <span>Registrar gasto</span>
+              </button>
+              <button
+                onClick={openBudgetCreateModal}
                 className="w-full bg-secondary text-secondary-foreground px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-secondary/80 transition-colors border border-border"
               >
                 <Plus className="w-4 h-4" />
@@ -372,6 +565,237 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
           </div>
         </div>
       </div>
+
+      <WalletMovementModal
+        open={movementModal.open}
+        onClose={closeMovementModal}
+        accountId={accountId}
+        userId={user?.id || null}
+        wallets={wallets}
+        categories={movementCategories}
+        defaultType={movementModal.type}
+        initialWalletId={movementModal.walletId}
+        onSuccess={async () => {
+          await Promise.all([refetchTransactions(), refetchWallets()])
+        }}
+      />
+
+      {showWalletForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Nueva Billetera</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleWalletCreateSubmit} className="space-y-4">
+                {walletFormError && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {walletFormError}
+                  </div>
+                )}
+                <Input
+                  type="text"
+                  placeholder="Nombre"
+                  value={walletFormData.name}
+                  onChange={(e) => setWalletFormData(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+                <div>
+                  <label className="block text-sm font-medium mb-2">Ícono</label>
+                  <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+                    {WALLET_ICON_OPTIONS.map((iconOption) => (
+                      <Button
+                        key={iconOption.key}
+                        type="button"
+                        variant={walletFormData.icon === iconOption.key ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setWalletFormData(prev => ({ ...prev, icon: iconOption.key }))}
+                        className="h-10 px-0"
+                        title={iconOption.label}
+                      >
+                        <IconGlyph value={iconOption.key} className="h-4 w-4" />
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Balance inicial (COP)</label>
+                  <Input
+                    type="text"
+                    numeric
+                    placeholder="0"
+                    value={walletBalanceInput}
+                    onFocus={() => {
+                      if (walletBalanceInput === '0') setWalletBalanceInput('')
+                    }}
+                    onChange={(e) => {
+                      setWalletBalanceInput(formatCOPInputFromRaw(e.target.value))
+                    }}
+                    onBlur={() => {
+                      setWalletBalanceInput(formatCOPInput(walletBalanceInput))
+                    }}
+                  />
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant={walletBalanceAdjustMode === 'add' ? 'default' : 'outline'}
+                        size="sm"
+                        className={walletBalanceAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                        onClick={() => setWalletBalanceAdjustMode('add')}
+                      >
+                        Sumar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={walletBalanceAdjustMode === 'subtract' ? 'destructive' : 'outline'}
+                        size="sm"
+                        className={walletBalanceAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                        onClick={() => setWalletBalanceAdjustMode('subtract')}
+                      >
+                        Restar
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                        <Button
+                          key={`dashboard-wallet-step-${quickAmount}`}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={`justify-start ${
+                            walletBalanceAdjustMode === 'add'
+                              ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                              : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                          }`}
+                          onClick={() => applyWalletBalanceStepByMode(quickAmount)}
+                        >
+                          {walletBalanceAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeWalletCreateModal}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" className="w-full sm:w-auto">Crear</Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {showBudgetForm && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleBudgetCreateSubmit} className="bg-card border border-border rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">Nuevo Presupuesto</h3>
+            {budgetFormError && (
+              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {budgetFormError}
+              </div>
+            )}
+            <div className="mb-4">
+              <label className="block text-sm mb-1">Nombre</label>
+              <Input
+                type="text"
+                placeholder="Nombre"
+                value={budgetFormData.name}
+                onChange={e => setBudgetFormData(prev => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm mb-1">Objetivo</label>
+              <Input
+                type="text"
+                numeric
+                placeholder="Objetivo"
+                value={budgetTargetInput}
+                onFocus={() => {
+                  if (budgetTargetInput === '0') setBudgetTargetInput('')
+                }}
+                onChange={e => {
+                  setBudgetTargetInput(formatCOPInputFromRaw(e.target.value))
+                }}
+                onBlur={() => {
+                  setBudgetTargetInput(formatCOPInput(budgetTargetInput))
+                }}
+                required
+                min={1}
+              />
+              <div className="mt-2 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={budgetTargetAdjustMode === 'add' ? 'default' : 'outline'}
+                    size="sm"
+                    className={budgetTargetAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
+                    onClick={() => setBudgetTargetAdjustMode('add')}
+                  >
+                    Sumar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={budgetTargetAdjustMode === 'subtract' ? 'destructive' : 'outline'}
+                    size="sm"
+                    className={budgetTargetAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                    onClick={() => setBudgetTargetAdjustMode('subtract')}
+                  >
+                    Restar
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
+                    <Button
+                      key={`dashboard-budget-step-${quickAmount}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={`justify-start ${
+                        budgetTargetAdjustMode === 'add'
+                          ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
+                          : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
+                      }`}
+                      onClick={() => applyBudgetTargetStepByMode(quickAmount)}
+                    >
+                      {budgetTargetAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Ícono</label>
+              <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+                {BUDGET_ICON_OPTIONS.map((iconOption) => (
+                  <Button
+                    key={iconOption.key}
+                    type="button"
+                    variant={budgetFormData.icon === iconOption.key ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setBudgetFormData(prev => ({ ...prev, icon: iconOption.key }))}
+                    className="h-10 px-0"
+                    title={iconOption.label}
+                  >
+                    <IconGlyph value={iconOption.key} className="h-4 w-4" />
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeBudgetCreateModal}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">Crear</Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

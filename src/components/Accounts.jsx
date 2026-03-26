@@ -1002,7 +1002,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                   />
                 </div>
 
-                <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+                <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
                   <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={closeContributionModal}>
                     Cerrar
                   </Button>

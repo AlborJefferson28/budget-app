@@ -398,7 +398,7 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
               value={formData.icon}
               onChange={(icon) => setFormData({ ...formData, icon })}
             />
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
               {editing && (
                 <Button
                   type="button"
@@ -410,8 +410,8 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
                   Eliminar
                 </Button>
               )}
-              <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ name: '', target: 0, icon: 'piggy-bank' }); setTargetInput('0'); setTargetAdjustMode('add'); }}>Cancelar</Button>
+              <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
             </div>
           </form>
         </div>

@@ -52,6 +52,7 @@ export const transactionsService = {
       .from('transactions')
       .select('*')
       .eq('account_id', accountId)
+      .order('occurred_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
     return { data, error }
   },

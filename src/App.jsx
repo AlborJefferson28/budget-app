@@ -111,15 +111,6 @@ function App() {
             onClearSelectedWallet={() => setSelectedWalletDetailId(null)}
           />
         )
-      case 'transactions':
-        return (
-          <Wallets
-            accountId={activeAccountId}
-            setPage={setCurrentPage}
-            selectedWalletId={selectedWalletDetailId}
-            onClearSelectedWallet={() => setSelectedWalletDetailId(null)}
-          />
-        )
       case 'budgets':
         return (
           <Budgets

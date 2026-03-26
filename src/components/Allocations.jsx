@@ -719,9 +719,9 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                 </p>
               )}
             </div>
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
-              <Button type="submit" className="w-full sm:w-auto" disabled={fundingLoading}>Crear</Button>
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setFormError(''); setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' }); setAmountInput('0'); setAmountAdjustMode('add'); }}>Cancelar</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={fundingLoading}>Crear</Button>
             </div>
           </form>
         </div>
