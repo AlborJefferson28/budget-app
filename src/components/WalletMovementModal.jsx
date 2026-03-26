@@ -173,11 +173,6 @@ export default function WalletMovementModal({
     const note = formData.note.trim()
     const category = formData.category.trim()
 
-    if (!note) {
-      setFormError('La nota es obligatoria.')
-      return
-    }
-
     if (!category) {
       setFormError('La categoría es obligatoria.')
       return
@@ -331,7 +326,6 @@ export default function WalletMovementModal({
               placeholder="Nota"
               value={formData.note}
               onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
-              required
             />
 
             <Input
