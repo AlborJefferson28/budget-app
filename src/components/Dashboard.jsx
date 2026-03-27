@@ -6,7 +6,7 @@ import { useBudgets } from '../hooks/useBudgets'
 import { useTransactions } from '../hooks/useTransactions'
 import { useAllocations } from '../hooks/useAllocations'
 import { accountTransfersService } from '../services'
-import { Wallet, TrendingUp, TrendingDown, Plus, ArrowRight, DollarSign, Target, Activity, Lightbulb } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Plus, ArrowRight, DollarSign, Activity, Lightbulb } from 'lucide-react'
 import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
 import { BUDGET_ICON_OPTIONS, IconGlyph, normalizeIconKey, WALLET_ICON_OPTIONS } from '../lib/icons'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
@@ -115,7 +115,6 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
     .filter(a => new Date(a.created_at).getMonth() === currentMonth && new Date(a.created_at).getFullYear() === currentYear)
     .reduce((sum, a) => sum + a.amount, 0)
   const monthlySpending = monthlyExpenseTransactions + monthlyBudgetAllocations
-  const globalRemaining = totalBalance - monthlySpending
 
   // Calcular progreso de budgets (asumiendo allocations como spent)
   const budgetProgress = budgets.map(budget => {
@@ -347,7 +346,7 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
         {/* Contenido principal */}
         <div className="lg:col-span-2 space-y-6">
           {/* Tarjetas de resumen */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-card border border-border p-6 rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
@@ -368,20 +367,6 @@ export default function Dashboard({ setPage, setSelectedAccount, accountId: sele
                 </div>
                 <div className="w-12 h-12 bg-destructive/15 rounded-full flex items-center justify-center">
                   <TrendingUp className="w-6 h-6 text-destructive" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-card border border-border p-6 rounded-xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Restante global</p>
-                  <p className={`text-2xl font-bold ${globalRemaining >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                    {formatCOP(globalRemaining)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">Balance total - gasto mensual</p>
-                </div>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${globalRemaining >= 0 ? 'bg-primary/15' : 'bg-destructive/15'}`}>
-                  <Target className={`w-6 h-6 ${globalRemaining >= 0 ? 'text-primary' : 'text-destructive'}`} />
                 </div>
               </div>
             </div>

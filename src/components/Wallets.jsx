@@ -255,11 +255,10 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
     return matchesSearch
   })
 
-  const quotaStatsByWalletId = useMemo(() => {
-    const stats = {}
+  const spentByWalletId = useMemo(() => {
+    const spentStats = {}
     wallets.forEach((wallet) => {
-      const baseAmount = normalizeCOPAmount(wallet.balance)
-      stats[wallet.id] = { spent: 0, baseAmount, remaining: baseAmount }
+      spentStats[wallet.id] = 0
     })
 
     transactions.forEach((transaction) => {
@@ -267,29 +266,24 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
         transaction.from_wallet &&
         (transaction.type === 'expense' || transaction.type === 'transfer')
 
-      if (isOutgoingMoney && stats[transaction.from_wallet]) {
-        stats[transaction.from_wallet].spent += normalizeCOPAmount(transaction.amount)
+      if (isOutgoingMoney && Number.isFinite(spentStats[transaction.from_wallet])) {
+        spentStats[transaction.from_wallet] += normalizeCOPAmount(transaction.amount)
       }
     })
 
     allocations.forEach((allocation) => {
-      if (allocation.wallet_id && stats[allocation.wallet_id]) {
-        stats[allocation.wallet_id].spent += normalizeCOPAmount(allocation.amount)
+      if (allocation.wallet_id && Number.isFinite(spentStats[allocation.wallet_id])) {
+        spentStats[allocation.wallet_id] += normalizeCOPAmount(allocation.amount)
       }
     })
 
     accountTransfers.forEach((transfer) => {
-      if (transfer.from_wallet_id && stats[transfer.from_wallet_id]) {
-        stats[transfer.from_wallet_id].spent += normalizeCOPAmount(transfer.amount)
+      if (transfer.from_wallet_id && Number.isFinite(spentStats[transfer.from_wallet_id])) {
+        spentStats[transfer.from_wallet_id] += normalizeCOPAmount(transfer.amount)
       }
     })
 
-    Object.keys(stats).forEach((walletId) => {
-      const baseAmount = stats[walletId].baseAmount || 0
-      stats[walletId].remaining = Math.max(baseAmount - stats[walletId].spent, 0)
-    })
-
-    return stats
+    return spentStats
   }, [wallets, transactions, allocations, accountTransfers])
 
   const movementCategories = useMemo(() => (
@@ -376,25 +370,18 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
             </CardHeader>
             <CardContent>
               {(() => {
-                const stats = quotaStatsByWalletId[wallet.id] || {
-                  spent: 0,
-                  baseAmount: normalizeCOPAmount(wallet.balance),
-                  remaining: normalizeCOPAmount(wallet.balance),
-                }
+                const currentBalance = normalizeCOPAmount(wallet.balance)
+                const totalSpent = spentByWalletId[wallet.id] || 0
                 return (
                   <>
                     <div className="mb-4 rounded-lg border border-border bg-muted/40 p-3">
-                      <p className="text-xs text-muted-foreground">Monto base</p>
-                      <p className="text-2xl font-bold text-foreground">{formatCOP(stats.baseAmount)}</p>
+                      <p className="text-xs text-muted-foreground">Saldo actual</p>
+                      <p className="text-2xl font-bold text-foreground">{formatCOP(currentBalance)}</p>
                     </div>
-                    <div className="mb-4 grid grid-cols-2 gap-2">
+                    <div className="mb-4 grid grid-cols-1 gap-2">
                       <div className="rounded-lg border border-border bg-muted/20 p-2.5">
                         <p className="text-[11px] text-muted-foreground">Gastado</p>
-                        <p className="text-sm font-semibold text-destructive">{formatCOP(stats.spent)}</p>
-                      </div>
-                      <div className="rounded-lg border border-border bg-muted/20 p-2.5">
-                        <p className="text-[11px] text-muted-foreground">Restante</p>
-                        <p className="text-sm font-semibold text-primary">{formatCOP(stats.remaining)}</p>
+                        <p className="text-sm font-semibold text-destructive">{formatCOP(totalSpent)}</p>
                       </div>
                     </div>
                   </>

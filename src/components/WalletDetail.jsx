@@ -133,8 +133,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
     return txSpent + allocationSpent + contributionSpent
   }, [walletTransactions, walletAllocations, walletAccountTransfers, currentWallet.id])
 
-  const baseAmount = normalizeCOPAmount(currentWallet.balance)
-  const remainingQuota = Math.max(baseAmount - totalSpent, 0)
+  const currentBalance = normalizeCOPAmount(currentWallet.balance)
 
   const movementHistory = useMemo(() => {
     const transactionEvents = walletTransactions.map((transaction) => {
@@ -369,7 +368,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div>
-              <p className="text-sm text-muted-foreground">Monto base</p>
+              <p className="text-sm text-muted-foreground">Saldo actual</p>
               {isEditing ? (
                 <div>
                   <Input
@@ -432,16 +431,12 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
                   </div>
                 </div>
               ) : (
-                <p className="text-3xl font-bold text-primary">{formatCOP(baseAmount)}</p>
+                <p className="text-3xl font-bold text-primary">{formatCOP(currentBalance)}</p>
               )}
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Gastado</p>
               <p className="text-2xl font-bold text-destructive">{formatCOP(totalSpent)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Restante</p>
-              <p className="text-2xl font-bold text-primary">{formatCOP(remainingQuota)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Creada</p>
