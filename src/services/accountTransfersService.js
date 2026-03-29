@@ -11,12 +11,13 @@ export const accountTransfersService = {
     return { data, error }
   },
 
-  async contributeToSharedAccount({ fromWalletId, toWalletId, amount, note = '' }) {
+  async contributeToSharedAccount({ fromWalletId, toWalletId, amount, note = '', idempotencyKey = null }) {
     const { data, error } = await supabase.rpc('contribute_to_shared_account', {
       p_from_wallet: fromWalletId,
       p_to_wallet: toWalletId,
       p_amount: amount,
       p_note: note || null,
+      p_idempotency_key: idempotencyKey,
     })
 
     return { data, error }

@@ -68,6 +68,8 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({ name: '' })
   const [editing, setEditing] = useState(null)
+  const [idempotencyKey, setIdempotencyKey] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [membersAccount, setMembersAccount] = useState(null)
@@ -77,6 +79,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   const [membersError, setMembersError] = useState('')
   const [membersNotice, setMembersNotice] = useState('')
   const [memberForm, setMemberForm] = useState({ identifier: '', role: 'member' })
+  const [memberIdempotencyKey, setMemberIdempotencyKey] = useState('')
 
   const [showContributionModal, setShowContributionModal] = useState(false)
   const [contributionAccount, setContributionAccount] = useState(null)
@@ -93,6 +96,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     note: '',
   })
   const [contributionAdjustMode, setContributionAdjustMode] = useState('add')
+  const [contributionIdempotencyKey, setContributionIdempotencyKey] = useState('')
   const [transfers, setTransfers] = useState([])
   const [transfersLoading, setTransfersLoading] = useState(false)
   const [transfersError, setTransfersError] = useState('')
@@ -203,6 +207,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
   const openCreateForm = () => {
     setEditing(null)
     setFormData({ name: '' })
+    setIdempotencyKey(crypto.randomUUID())
     setShowForm(true)
   }
 
@@ -236,6 +241,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
     setMembersError('')
     setMembersNotice('')
     setMemberForm({ identifier: '', role: 'member' })
+    setMemberIdempotencyKey(crypto.randomUUID())
     setShowMembersModal(true)
     await loadMembers(account.id)
   }
@@ -347,6 +353,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       note: '',
     })
     setContributionAdjustMode('add')
+    setContributionIdempotencyKey(crypto.randomUUID())
     setContributionLoading(false)
   }
 
@@ -386,9 +393,22 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       await updateAccount(editing.id, payload)
       setEditing(null)
     } else {
-      await createAccount(payload)
+      setSubmitting(true)
+      const { error } = await createAccount({ ...payload, idempotency_key: idempotencyKey })
+      setSubmitting(true)
+      
+      if (error) {
+        if (error.code === '23505') {
+          alert('Esta cuenta ya ha sido registrada (duplicado detectado).')
+        } else {
+          alert(error.message || 'No fue posible crear la cuenta.')
+        }
+        setSubmitting(false)
+        return
+      }
     }
 
+    setSubmitting(false)
     closeForm()
   }
 
@@ -437,7 +457,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       return
     }
 
-    const { error: addError } = await accountMembersService.addMember(membersAccount.id, userId, memberForm.role)
+    const { error: addError } = await accountMembersService.addMember(membersAccount.id, userId, memberForm.role, memberIdempotencyKey)
 
     if (addError) {
       setMembersError(getErrorMessage(addError, 'Could not add member.'))
@@ -447,6 +467,7 @@ export default function Accounts({ setPage, setSelectedAccount }) {
         setMembersAccount(prev => prev ? { ...prev, kind: 'shared' } : prev)
       }
       setMemberForm({ identifier: '', role: 'member' })
+      setMemberIdempotencyKey(crypto.randomUUID())
       setMembersNotice('Member added successfully.')
       await loadMembers(membersAccount.id)
       notifyAccountsChanged()
@@ -501,10 +522,15 @@ export default function Accounts({ setPage, setSelectedAccount }) {
       toWalletId: contributionForm.to_wallet,
       amount: parsedAmount,
       note: contributionForm.note.trim(),
+      idempotencyKey: contributionIdempotencyKey,
     })
 
     if (transferError) {
-      setContributionError(getErrorMessage(transferError, 'Could not process contribution.'))
+      if (transferError.code === '23505') {
+        setContributionError('Este aporte ya ha sido registrado (duplicado detectado).')
+      } else {
+        setContributionError(getErrorMessage(transferError, 'Could not process contribution.'))
+      }
     } else {
       setContributionNotice('Aporte registrado correctamente.')
       setContributionForm(prev => ({ ...prev, amount: formatCOPInput(0), note: '' }))
@@ -636,7 +662,9 @@ export default function Accounts({ setPage, setSelectedAccount }) {
                 </Button>
               )}
               <Button type="button" variant="outline" onClick={closeForm}>Cancelar</Button>
-              <Button type="submit">{editing ? 'Actualizar' : 'Crear'}</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Procesando...' : (editing ? 'Actualizar' : 'Crear')}
+              </Button>
             </div>
           </form>
         </div>

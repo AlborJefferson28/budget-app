@@ -60,6 +60,7 @@ export default function WalletMovementModal({
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showCategoryMenu, setShowCategoryMenu] = useState(false)
+  const [idempotencyKey, setIdempotencyKey] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -68,6 +69,7 @@ export default function WalletMovementModal({
     setFormError('')
     setSubmitting(false)
     setShowCategoryMenu(false)
+    setIdempotencyKey(crypto.randomUUID())
   }, [open, defaultType, initialWalletId, wallets])
 
   useEffect(() => {
@@ -196,13 +198,18 @@ export default function WalletMovementModal({
       category,
       occurred_at: toIsoDatetimeFromDate(formData.occurred_at),
       created_by: userId || null,
+      idempotency_key: idempotencyKey,
     }
 
     setSubmitting(true)
     const { error } = await transactionsService.create(payload)
 
     if (error) {
-      setFormError(error.message || 'No fue posible registrar el movimiento.')
+      if (error.code === '23505') {
+        setFormError('Este movimiento ya ha sido registrado (duplicado detectado).')
+      } else {
+        setFormError(error.message || 'No fue posible registrar el movimiento.')
+      }
       setSubmitting(false)
       return
     }

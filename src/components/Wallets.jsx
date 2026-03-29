@@ -37,6 +37,8 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
   const [transferSubmitting, setTransferSubmitting] = useState(false)
   const [transferError, setTransferError] = useState('')
   const [movementModal, setMovementModal] = useState({ open: false, type: 'income', walletId: '' })
+  const [idempotencyKey, setIdempotencyKey] = useState('')
+  const [transferIdempotencyKey, setTransferIdempotencyKey] = useState('')
 
   useEffect(() => {
     if (!selectedWalletId) return
@@ -84,6 +86,7 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
     setFormData({ name: '', icon: 'wallet', balance: 0 })
     setBalanceInput('0')
     setBalanceAdjustMode('add')
+    setIdempotencyKey(crypto.randomUUID())
     setShowForm(true)
   }
 
@@ -118,7 +121,11 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
     if (editing) {
       await updateWallet(editing.id, payload)
     } else {
-      await createWallet(payload)
+      const { error } = await createWallet({ ...payload, idempotency_key: idempotencyKey })
+      if (error && error.code === '23505') {
+        alert('Esta billetera ya ha sido registrada (duplicado detectado).')
+        return
+      }
     }
     resetForm()
   }
@@ -159,6 +166,7 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
       to_wallet: defaultTargetId,
       amount: '0',
     })
+    setTransferIdempotencyKey(crypto.randomUUID())
     setShowTransferModal(true)
   }
 
@@ -237,10 +245,15 @@ export default function Wallets({ accountId, setPage, selectedWalletId = null, o
       category: null,
       occurred_at: new Date().toISOString(),
       created_by: user?.id || null,
+      idempotency_key: transferIdempotencyKey,
     })
 
     if (transactionError) {
-      setTransferError(transactionError.message || 'No fue posible registrar la transferencia.')
+      if (transactionError.code === '23505') {
+        setTransferError('Esta transferencia ya ha sido registrada (duplicado detectado).')
+      } else {
+        setTransferError(transactionError.message || 'No fue posible registrar la transferencia.')
+      }
       setTransferSubmitting(false)
       return
     }

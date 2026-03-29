@@ -9,10 +9,10 @@ export const accountMembersService = {
     return { data, error }
   },
 
-  async addMember(accountId, userId, role = 'member') {
+  async addMember(accountId, userId, role = 'member', idempotencyKey = null) {
     const { data, error } = await supabase
       .from('account_members')
-      .insert({ account_id: accountId, user_id: userId, role })
+      .insert({ account_id: accountId, user_id: userId, role, idempotency_key: idempotencyKey })
       .select()
     return { data, error }
   },

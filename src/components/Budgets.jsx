@@ -59,6 +59,8 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
   const [activeTab, setActiveTab] = useState('active');
   const [formError, setFormError] = useState('');
   const [targetAdjustMode, setTargetAdjustMode] = useState('add');
+  const [idempotencyKey, setIdempotencyKey] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const openCreateForm = () => {
     setEditing(null);
@@ -66,6 +68,7 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
     setFormData({ name: '', target: 0, icon: 'piggy-bank' });
     setTargetInput('0');
     setTargetAdjustMode('add');
+    setIdempotencyKey(crypto.randomUUID());
     setShowForm(true);
   };
 
@@ -116,7 +119,18 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
       await updateBudget(editing.id, dataToSubmit);
       setEditing(null);
     } else {
-      await createBudget(dataToSubmit);
+      setSubmitting(true);
+      const { error } = await createBudget({ ...dataToSubmit, idempotency_key: idempotencyKey });
+      setSubmitting(false);
+      
+      if (error) {
+        if (error.code === '23505') {
+          setFormError('Este presupuesto ya ha sido registrado (duplicado detectado).');
+        } else {
+          setFormError(error.message || 'No fue posible crear el presupuesto.');
+        }
+        return;
+      }
     }
     setFormData({ name: '', target: 0, icon: 'piggy-bank' });
     setTargetInput('0');
@@ -411,7 +425,9 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
                 </Button>
               )}
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ name: '', target: 0, icon: 'piggy-bank' }); setTargetInput('0'); setTargetAdjustMode('add'); }}>Cancelar</Button>
-              <Button type="submit" className="w-full sm:w-auto">{editing ? 'Actualizar' : 'Crear'}</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
+                {submitting ? 'Procesando...' : (editing ? 'Actualizar' : 'Crear')}
+              </Button>
             </div>
           </form>
         </div>

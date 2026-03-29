@@ -59,6 +59,9 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
   const [formError, setFormError] = useState('');
   const [viewingAllocation, setViewingAllocation] = useState(null);
   const [amountAdjustMode, setAmountAdjustMode] = useState('add');
+  const [idempotencyKey, setIdempotencyKey] = useState('');
+  const [contributionIdempotencyKey, setContributionIdempotencyKey] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const pageSize = 4;
 
   const activeAccount = useMemo(
@@ -279,6 +282,7 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
         toWalletId: formData.wallet_id,
         amount,
         note: `Funding allocation for ${selectedBudget?.name || 'budget'}`,
+        idempotencyKey: contributionIdempotencyKey,
       });
 
       if (contributionError) {
@@ -293,14 +297,21 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
       }
     }
 
+    setSubmitting(true);
     const { error: createError } = await createAllocation({
       wallet_id: formData.wallet_id,
       budget_id: formData.budget_id,
       amount,
+      idempotency_key: idempotencyKey,
     });
+    setSubmitting(false);
 
     if (createError) {
-      setFormError(getErrorMessage(createError, 'No fue posible registrar la asignación.'));
+      if (createError.code === '23505') {
+        setFormError('Esta asignación ya ha sido registrada (duplicado detectado).');
+      } else {
+        setFormError(getErrorMessage(createError, 'No fue posible registrar la asignación.'));
+      }
       return;
     }
 
@@ -354,6 +365,8 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
     setAmountInput('0');
     setAmountAdjustMode('add');
     setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
+    setIdempotencyKey(crypto.randomUUID());
+    setContributionIdempotencyKey(crypto.randomUUID());
     setShowForm(true);
   };
 
@@ -721,7 +734,9 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setFormError(''); setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' }); setAmountInput('0'); setAmountAdjustMode('add'); }}>Cancelar</Button>
-              <Button type="submit" className="w-full sm:w-auto" disabled={fundingLoading}>Crear</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={fundingLoading || submitting}>
+                {submitting ? 'Procesando...' : 'Crear'}
+              </Button>
             </div>
           </form>
         </div>
