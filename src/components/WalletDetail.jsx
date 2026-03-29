@@ -10,8 +10,7 @@ import { Skeleton } from './ui/Skeleton'
 import { ArrowLeft, ArrowRightLeft, Check, Download, Edit, Eye, PiggyBank, TrendingDown, TrendingUp, Trash2, X } from 'lucide-react'
 import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
 import { IconGlyph, WALLET_ICON_OPTIONS, normalizeIconKey } from '../lib/icons'
-
-const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
+import { AmountInput } from './ui/AmountInput'
 
 const formatDateLabel = (value) => {
   if (!value) return 'Sin datos'
@@ -40,12 +39,15 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
   const [currentWallet, setCurrentWallet] = useState(wallet)
   const [editError, setEditError] = useState('')
   const [editNotice, setEditNotice] = useState('')
-  const [balanceAdjustMode, setBalanceAdjustMode] = useState('add')
   const [editForm, setEditForm] = useState({
     name: wallet.name,
     icon: normalizeIconKey(wallet.icon, 'wallet'),
     balanceInput: formatCOPInput(wallet.balance)
   })
+  const [searchHistory, setSearchHistory] = useState('')
+  const [filterType, setFilterType] = useState('all')
+  const [sortField, setSortField] = useState('date')
+  const [sortOrder, setSortOrder] = useState('desc')
 
   const getTransactionDate = (transaction) => transaction?.occurred_at || transaction?.created_at
   const toDateMs = (value) => {
@@ -61,7 +63,6 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
       icon: normalizeIconKey(wallet.icon, 'wallet'),
       balanceInput: formatCOPInput(wallet.balance),
     })
-    setBalanceAdjustMode('add')
     setIsEditing(false)
     setEditError('')
     setEditNotice('')
@@ -206,24 +207,43 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
       }
     })
 
-    return [...transactionEvents, ...allocationEvents, ...accountTransferEvents]
-      .sort((a, b) => toDateMs(b.date) - toDateMs(a.date))
-  }, [walletTransactions, walletAllocations, walletAccountTransfers, currentWallet.id, currentWallet.name])
+    const history = [...transactionEvents, ...allocationEvents, ...accountTransferEvents]
+
+    let filtered = history
+
+    if (searchHistory) {
+      const lowerSearch = searchHistory.toLowerCase()
+      filtered = filtered.filter(m =>
+        m.title.toLowerCase().includes(lowerSearch) ||
+        m.subtitle.toLowerCase().includes(lowerSearch)
+      )
+    }
+
+    if (filterType !== 'all') {
+      filtered = filtered.filter(m => {
+        if (filterType === 'income') return m.title === 'Ingreso' || (m.title === 'Aporte entre cuentas' && m.amountPrefix === '+')
+        if (filterType === 'expense') return m.title === 'Gasto' || (m.title === 'Aporte entre cuentas' && m.amountPrefix === '-')
+        if (filterType === 'transfer') return m.title === 'Transferencia entre billeteras'
+        if (filterType === 'allocation') return m.title === 'Asignación a presupuesto'
+        return true
+      })
+    }
+
+    filtered.sort((a, b) => {
+      let comparison = 0
+      if (sortField === 'date') {
+        comparison = toDateMs(b.date) - toDateMs(a.date)
+      } else if (sortField === 'amount') {
+        comparison = b.amount - a.amount
+      }
+      return sortOrder === 'desc' ? comparison : -comparison
+    })
+
+    return filtered
+  }, [walletTransactions, walletAllocations, walletAccountTransfers, currentWallet.id, currentWallet.name, searchHistory, filterType, sortField, sortOrder])
 
   const latestActivity = movementHistory[0]?.date || currentWallet.created_at
 
-  const applyBalanceQuickAmount = (amount) => {
-    const nextValue = Math.max(0, normalizeCOPAmount(editForm.balanceInput) + amount)
-    setEditForm(prev => ({
-      ...prev,
-      balanceInput: formatCOPInput(nextValue),
-    }))
-  }
-
-  const applyBalanceStepByMode = (step) => {
-    const sign = balanceAdjustMode === 'add' ? 1 : -1
-    applyBalanceQuickAmount(step * sign)
-  }
 
   const handleDelete = async () => {
     if (window.confirm('¿Estás seguro de eliminar esta billetera?')) {
@@ -371,7 +391,7 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
               <p className="text-sm text-muted-foreground">Saldo actual</p>
               {isEditing ? (
                 <div>
-                  <Input
+                  <AmountInput
                     type="text"
                     numeric
                     value={editForm.balanceInput}
@@ -386,49 +406,11 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
                     onBlur={() => {
                       setEditForm(prev => ({ ...prev, balanceInput: formatCOPInput(prev.balanceInput) }))
                     }}
+                    onStep={(val) => {
+                      setEditForm(prev => ({ ...prev, balanceInput: formatCOPInput(val) }))
+                    }}
                     className="text-2xl font-bold"
                   />
-                  <div className="mt-2 space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="button"
-                        variant={balanceAdjustMode === 'add' ? 'default' : 'outline'}
-                        size="sm"
-                        className={balanceAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
-                        onClick={() => setBalanceAdjustMode('add')}
-                      >
-                        Sumar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={balanceAdjustMode === 'subtract' ? 'destructive' : 'outline'}
-                        size="sm"
-                        className={balanceAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
-                        onClick={() => setBalanceAdjustMode('subtract')}
-                      >
-                        Restar
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      {QUICK_AMOUNT_STEPS.map((quickAmount) => (
-                        <Button
-                          key={`detail-balance-step-${quickAmount}`}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className={`justify-start ${
-                            balanceAdjustMode === 'add'
-                              ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
-                              : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
-                          }`}
-                          onClick={() => applyBalanceStepByMode(quickAmount)}
-                        >
-                          {balanceAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <p className="text-3xl font-bold text-primary">{formatCOP(currentBalance)}</p>
@@ -459,7 +441,46 @@ export default function WalletDetail({ wallet, onBack, onDelete, updateWallet })
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Historial de movimientos</CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <CardTitle>Historial de movimientos</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                placeholder="Buscar..."
+                value={searchHistory}
+                onChange={e => setSearchHistory(e.target.value)}
+                className="h-8 w-40"
+              />
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="h-8 w-32 text-xs">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="income">Ingresos</SelectItem>
+                  <SelectItem value="expense">Gastos</SelectItem>
+                  <SelectItem value="transfer">Transferencias</SelectItem>
+                  <SelectItem value="allocation">Asignaciones</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortField} onValueChange={setSortField}>
+                <SelectTrigger className="h-8 w-28 text-xs">
+                  <SelectValue placeholder="Ordenar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date">Fecha</SelectItem>
+                  <SelectItem value="amount">Monto</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              >
+                {sortOrder === 'desc' ? '↓' : '↑'}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isMovementsLoading ? (

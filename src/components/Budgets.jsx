@@ -3,16 +3,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { useBudgets } from '../hooks/useBudgets';
 import { useAllocations } from '../hooks/useAllocations';
 import { useAccounts } from '../hooks/useAccounts';
+import { useWallets } from '../hooks/useWallets';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { ProgressBar } from './ui/ProgressBar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select';
 import { Input } from './ui/Input';
 import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency';
 import { Trash2 } from 'lucide-react';
 import { BUDGET_ICON_OPTIONS, IconGlyph, normalizeIconKey } from '../lib/icons';
+import BudgetModal from './modals/BudgetModal';
 import { BudgetsSkeleton } from './RouteSkeletons';
 import BudgetDetail from './BudgetDetail';
+import { Checkbox } from './ui/Checkbox';
+import BulkPayModal from './modals/BulkPayModal';
 
 const TABS = [
   { key: 'active', label: 'Metas activas' },
@@ -21,55 +26,53 @@ const TABS = [
   { key: 'archived', label: 'Archivados' },
 ];
 
-const QUICK_AMOUNT_STEPS = [10000, 50000, 100000];
-
-function IconPicker({ value, onChange }) {
-  return (
-    <div className="mb-4">
-      <label className="block text-sm font-medium mb-2">Ícono</label>
-      <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
-        {BUDGET_ICON_OPTIONS.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            onClick={() => onChange(option.key)}
-            className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center transition-all hover:scale-105 ${
-              value === option.key ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:border-primary/40'
-            }`}
-            title={option.label}
-          >
-            <IconGlyph value={option.key} className="h-5 w-5" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function Budgets({ accountId, setPage, selectedBudgetId, onClearSelectedBudget }) {
   const { user } = useAuth();
   const { accounts } = useAccounts();
-  const { budgets, loading: budgetsLoading, error: budgetsError, createBudget, updateBudget, deleteBudget } = useBudgets(accountId);
-  const { allocations, loading: allocationsLoading } = useAllocations(accountId);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', target: 0, icon: 'piggy-bank' });
-  const [targetInput, setTargetInput] = useState('0');
-  const [editing, setEditing] = useState(null);
+  const { budgets, loading: budgetsLoading, error: budgetsError, updateBudget, deleteBudget, refetch: refetchBudgets } = useBudgets(accountId);
+  const { allocations, loading: allocationsLoading, deleteAllocation, createAllocationsBulk, refetch: refetchAllocations } = useAllocations(accountId);
+  const { wallets, refetch: refetchWallets } = useWallets(accountId);
+  const [showModal, setShowModal] = useState(false);
+  const [editingBudget, setEditingBudget] = useState(null);
   const [selectedBudget, setSelectedBudget] = useState(null);
   const [activeTab, setActiveTab] = useState('active');
-  const [formError, setFormError] = useState('');
-  const [targetAdjustMode, setTargetAdjustMode] = useState('add');
-  const [idempotencyKey, setIdempotencyKey] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [searchBudgets, setSearchBudgets] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [selectedBudgetIds, setSelectedBudgetIds] = useState([]);
+  const [showBulkPayModal, setShowBulkPayModal] = useState(false);
+
+  const needsReset = (budget) => {
+    if (!budget.reset_period || budget.reset_period === 'none') return false;
+    const lastReset = new Date(budget.last_reset_at || 0);
+    const now = new Date();
+    
+    if (budget.reset_period === 'monthly') {
+      return lastReset.getMonth() !== now.getMonth() || lastReset.getFullYear() !== now.getFullYear();
+    }
+    if (budget.reset_period === 'weekly') {
+      const oneWeek = 7 * 24 * 60 * 60 * 1000;
+      return (now - lastReset) > oneWeek;
+    }
+    if (budget.reset_period === 'yearly') {
+      return lastReset.getFullYear() !== now.getFullYear();
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    if (budgetsLoading || !budgets.length) return;
+    
+    budgets.forEach(budget => {
+      if (needsReset(budget)) {
+        updateBudget(budget.id, { last_reset_at: new Date().toISOString() });
+      }
+    });
+  }, [budgets, budgetsLoading]);
 
   const openCreateForm = () => {
-    setEditing(null);
-    setFormError('');
-    setFormData({ name: '', target: 0, icon: 'piggy-bank' });
-    setTargetInput('0');
-    setTargetAdjustMode('add');
-    setIdempotencyKey(crypto.randomUUID());
-    setShowForm(true);
+    setEditingBudget(null);
+    setShowModal(true);
   };
 
   useEffect(() => {
@@ -89,97 +92,31 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
     return { label: 'Activo', color: 'bg-primary', text: 'text-primary' };
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setFormError('');
-    const normalizedTarget = normalizeCOPAmount(targetInput);
-
-    if (normalizedTarget <= 0) {
-      setFormError('El objetivo del presupuesto debe ser mayor a 0.');
-      return;
-    }
-
-    if (editing) {
-      const currentAssigned = allocations
-        .filter((allocation) => allocation.budget_id === editing.id)
-        .reduce((sum, allocation) => sum + (allocation.amount || 0), 0);
-
-      if (normalizedTarget < currentAssigned) {
-        setFormError(`El objetivo no puede ser menor a lo ya asignado (${formatCOP(currentAssigned)}).`);
-        return;
-      }
-    }
-
-    const dataToSubmit = {
-      ...formData,
-      target: normalizedTarget,
-      icon: normalizeIconKey(formData.icon, 'piggy-bank')
-    };
-    if (editing) {
-      await updateBudget(editing.id, dataToSubmit);
-      setEditing(null);
-    } else {
-      setSubmitting(true);
-      const { error } = await createBudget({ ...dataToSubmit, idempotency_key: idempotencyKey });
-      setSubmitting(false);
-      
-      if (error) {
-        if (error.code === '23505') {
-          setFormError('Este presupuesto ya ha sido registrado (duplicado detectado).');
-        } else {
-          setFormError(error.message || 'No fue posible crear el presupuesto.');
-        }
-        return;
-      }
-    }
-    setFormData({ name: '', target: 0, icon: 'piggy-bank' });
-    setTargetInput('0');
-    setTargetAdjustMode('add');
-    setShowForm(false);
-  };
-
-  const applyTargetQuickDelta = (delta) => {
-    const nextValue = Math.max(0, normalizeCOPAmount(targetInput) + delta);
-    setTargetInput(formatCOPInput(nextValue));
-  };
-
-  const applyTargetStepByMode = (step) => {
-    const sign = targetAdjustMode === 'add' ? 1 : -1;
-    applyTargetQuickDelta(step * sign);
-  };
 
   const handleEdit = (budget) => {
-    setEditing(budget);
-    setFormError('');
-    const iconKey = normalizeIconKey(budget.icon, 'piggy-bank');
-    setFormData({ name: budget.name, target: budget.target, icon: iconKey });
-    setTargetInput(formatCOPInput(budget.target));
-    setTargetAdjustMode('add');
-    setShowForm(true);
+    setEditingBudget(budget);
+    setShowModal(true);
   };
 
-  const handleDelete = async (id, closeModal = false) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este presupuesto?')) {
       await deleteBudget(id);
-      if (closeModal) {
-        setShowForm(false);
-        setEditing(null);
-        setFormData({ name: '', target: 0, icon: 'piggy-bank' });
-        setTargetInput('0');
-        setTargetAdjustMode('add');
-      }
     }
   };
 
-  // Calcular valores reales de current y progress basados en allocations
+  // Calcular valores reales de current y progress basados en allocations y last_reset_at
   const budgetsWithProgress = budgets.map((budget) => {
-    const budgetAllocations = allocations.filter(allocation => allocation.budget_id === budget.id);
+    const lastReset = budget.last_reset_at ? new Date(budget.last_reset_at) : new Date(0);
+    const budgetAllocations = allocations.filter(allocation => 
+      allocation.budget_id === budget.id && 
+      new Date(allocation.created_at) >= lastReset
+    );
     const current = budgetAllocations.reduce((sum, allocation) => sum + (allocation.amount || 0), 0);
     const progress = budget.target > 0 ? current / budget.target : 0;
     return {
       ...budget,
       current,
-      progress: Math.min(progress, 1), // Limitar a 100% máximo
+      progress: Math.min(progress, 1),
     };
   });
 
@@ -190,15 +127,34 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
   const isSharedContext = activeAccount?.kind === 'shared' || activeAccount?.owner_id !== user?.id;
 
   const budgetsByTab = useMemo(() => {
-    const active = budgetsWithProgress.filter(budget => budget.progress < 1);
-    const met = budgetsWithProgress.filter(budget => budget.progress >= 1);
-    const shared = isSharedContext ? budgetsWithProgress : [];
-    const archived = budgetsWithProgress.filter(
+    let base = [...budgetsWithProgress];
+
+    if (searchBudgets) {
+      const lowerSearch = searchBudgets.toLowerCase();
+      base = base.filter(b => b.name.toLowerCase().includes(lowerSearch));
+    }
+
+    base.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (sortField === 'target') {
+        comparison = (a.target || 0) - (b.target || 0);
+      } else if (sortField === 'progress') {
+        comparison = (a.progress || 0) - (b.progress || 0);
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    const active = base.filter(budget => budget.progress < 1);
+    const met = base.filter(budget => budget.progress >= 1);
+    const shared = isSharedContext ? base : [];
+    const archived = base.filter(
       budget => budget.archived === true || budget.is_archived === true || budget.status === 'archived'
     );
 
     return { active, met, shared, archived };
-  }, [budgetsWithProgress, isSharedContext]);
+  }, [budgetsWithProgress, isSharedContext, searchBudgets, sortField, sortOrder]);
 
   const visibleBudgets = budgetsByTab[activeTab] || [];
   const shouldShowCreateCard = activeTab !== 'met' && activeTab !== 'archived';
@@ -211,6 +167,20 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
 
   if (budgetsLoading || allocationsLoading) return <BudgetsSkeleton />;
   if (budgetsError) return <div className="p-8 text-destructive">Error: {budgetsError.message}</div>;
+
+  const toggleSelectBudget = (id) => {
+    setSelectedBudgetIds(prev => 
+      prev.includes(id) ? prev.filter(bid => bid !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkPaySuccess = () => {
+    setSelectedBudgetIds([]);
+    refetchAllocations();
+    refetchWallets();
+  };
+
+  const selectedBudgetsData = budgetsWithProgress.filter(b => selectedBudgetIds.includes(b.id));
 
   if (selectedBudget) {
     const budgetWithProgress = budgetsWithProgress.find((budget) => budget.id === selectedBudget.id) || selectedBudget;
@@ -228,6 +198,10 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
           setSelectedBudget(null);
           onClearSelectedBudget?.();
           handleEdit(budgetWithProgress);
+        }}
+        onDeleteAllocation={async (id) => {
+          await deleteAllocation(id);
+          refetchWallets();
         }}
       />
     );
@@ -259,6 +233,36 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
         ))}
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex-1">
+          <Input
+            placeholder="Buscar presupuesto..."
+            value={searchBudgets}
+            onChange={e => setSearchBudgets(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Select value={sortField} onValueChange={setSortField}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Ordenar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Nombre</SelectItem>
+              <SelectItem value="target">Meta</SelectItem>
+              <SelectItem value="progress">Progreso</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="w-10 p-0"
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </Button>
+        </div>
+      </div>
+
       {/* Grid de Budgets */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {visibleBudgets.map((budget, idx) => {
@@ -266,7 +270,7 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
           return (
             <Card
               key={budget.id || idx}
-              className="relative group cursor-pointer transition hover:border-primary/40"
+              className={`relative group cursor-pointer transition hover:border-primary/40 ${selectedBudgetIds.includes(budget.id) ? 'border-primary ring-1 ring-primary/20 bg-primary/[0.02]' : ''}`}
               onClick={() => setSelectedBudget(budget)}
               role="button"
               tabIndex={0}
@@ -277,6 +281,16 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
                 }
               }}
             >
+              <div 
+                className="absolute top-3 right-3 z-10"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Checkbox 
+                  checked={selectedBudgetIds.includes(budget.id)}
+                  onCheckedChange={() => toggleSelectBudget(budget.id)}
+                  className="h-5 w-5 border-2 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                />
+              </div>
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconGlyph value={budget.icon} fallback="piggy-bank" className="h-5 w-5" />
@@ -286,8 +300,14 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
                 )}
               </CardHeader>
               <CardContent className="pt-0">
-                <CardTitle className="text-lg mb-2 flex items-center gap-2">
-                  {budget.name}
+                <CardTitle className="text-lg mb-2 flex items-center justify-between gap-2">
+                  <span className="truncate">{budget.name}</span>
+                  {budget.reset_period && budget.reset_period !== 'none' && (
+                    <span className="inline-flex items-center rounded-full bg-secondary/20 px-2 py-0.5 text-[10px] font-bold text-secondary-foreground uppercase tracking-tight">
+                      {budget.reset_period === 'monthly' ? 'Mensual' : 
+                       budget.reset_period === 'weekly' ? 'Semanal' : 'Anual'}
+                    </span>
+                  )}
                 </CardTitle>
                 <div className="mb-2">
                   <ProgressBar value={Math.round(budget.progress * 100)} color={status.color} />
@@ -327,109 +347,52 @@ export default function Budgets({ accountId, setPage, selectedBudgetId, onClearS
         <p className="mt-4 text-sm text-muted-foreground">{emptyByTab[activeTab]}</p>
       )}
 
-      {/* Modal/Formulario */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-md relative max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">{editing ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h3>
-            {formError && (
-              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {formError}
+      <BudgetModal
+        open={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setEditingBudget(null);
+        }}
+        accountId={accountId}
+        editingBudget={editingBudget}
+        onSuccess={() => refetchBudgets()}
+      />
+
+      <BulkPayModal
+        open={showBulkPayModal}
+        onClose={() => setShowBulkPayModal(false)}
+        selectedBudgets={selectedBudgetsData}
+        wallets={wallets}
+        onCreateAllocations={createAllocationsBulk}
+        userId={user?.id}
+        onSuccess={handleBulkPaySuccess}
+      />
+
+      {/* Floating Bulk Actions Bar */}
+      {selectedBudgetIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[90%] max-w-lg">
+          <div className="bg-foreground text-background rounded-2xl shadow-2xl p-4 flex items-center justify-between gap-4 animate-in slide-in-from-bottom-10 duration-300">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-background/10 text-background">
+                <span className="font-bold">{selectedBudgetIds.length}</span>
               </div>
-            )}
-            <div className="mb-4">
-              <label className="block text-sm mb-1">Nombre</label>
-              <Input
-                type="text"
-                placeholder="Nombre"
-                value={formData.name}
-                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-            </div>
-            <div className="mb-6">
-              <label className="block text-sm mb-1">Objetivo</label>
-              <Input
-                type="text"
-                numeric
-                placeholder="Objetivo"
-                value={targetInput}
-                onFocus={() => {
-                  if (targetInput === '0') setTargetInput('');
-                }}
-                onChange={e => {
-                  setTargetInput(formatCOPInputFromRaw(e.target.value));
-                }}
-                onBlur={() => {
-                  setTargetInput(formatCOPInput(targetInput));
-                }}
-                required
-                min={1}
-              />
-              <div className="mt-2 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={targetAdjustMode === 'add' ? 'default' : 'outline'}
-                    size="sm"
-                    className={targetAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
-                    onClick={() => setTargetAdjustMode('add')}
-                  >
-                    Sumar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={targetAdjustMode === 'subtract' ? 'destructive' : 'outline'}
-                    size="sm"
-                    className={targetAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
-                    onClick={() => setTargetAdjustMode('subtract')}
-                  >
-                    Restar
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
-                    <Button
-                      key={`budget-step-${quickAmount}`}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className={`justify-start ${
-                        targetAdjustMode === 'add'
-                          ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
-                          : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
-                      }`}
-                      onClick={() => applyTargetStepByMode(quickAmount)}
-                    >
-                      {targetAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <IconPicker
-              value={formData.icon}
-              onChange={(icon) => setFormData({ ...formData, icon })}
-            />
-            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-              {editing && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full sm:w-auto mr-auto border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => handleDelete(editing.id, true)}
+              <div>
+                <p className="text-sm font-bold">Seleccionados</p>
+                <button 
+                  onClick={() => setSelectedBudgetIds([])}
+                  className="text-xs text-background/60 hover:text-background underline decoration-dotted"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Eliminar
-                </Button>
-              )}
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => { setShowForm(false); setEditing(null); setFormError(''); setFormData({ name: '', target: 0, icon: 'piggy-bank' }); setTargetInput('0'); setTargetAdjustMode('add'); }}>Cancelar</Button>
-              <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
-                {submitting ? 'Procesando...' : (editing ? 'Actualizar' : 'Crear')}
-              </Button>
+                  Desmarcar todos
+                </button>
+              </div>
             </div>
-          </form>
+            <Button 
+              onClick={() => setShowBulkPayModal(true)}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6 h-11 rounded-xl shadow-lg shadow-primary/20"
+            >
+              Pagar seleccionado(s)
+            </Button>
+          </div>
         </div>
       )}
     </div>

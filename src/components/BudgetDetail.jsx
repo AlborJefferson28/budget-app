@@ -1,5 +1,8 @@
-import { ArrowLeft, PencilLine } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { ArrowLeft, PencilLine, Trash2, User } from 'lucide-react'
 import { Button } from './ui/Button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
+import { Input } from './ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
 import { ProgressBar } from './ui/ProgressBar'
 import { formatCOP } from '../lib/currency'
@@ -14,14 +17,40 @@ const formatDate = (value) => {
   return parsed.toLocaleString('es-CO')
 }
 
-export default function BudgetDetail({ budget, allocations, onBack, onEdit }) {
+export default function BudgetDetail({ budget, allocations, onBack, onEdit, onDeleteAllocation }) {
   const { user } = useAuth()
   const { events: budgetEvents, loading: eventsLoading, error: eventsError } = useBudgetEvents(budget?.id)
-  const totalAssigned = allocations.reduce((sum, allocation) => sum + (allocation.amount || 0), 0)
+  const [searchMovements, setSearchMovements] = useState('')
+  const [sortField, setSortField] = useState('date')
+  const [sortOrder, setSortOrder] = useState('desc')
+  const lastReset = budget?.last_reset_at ? new Date(budget.last_reset_at) : new Date(0)
+  const currentAllocations = allocations.filter(a => new Date(a.created_at) >= lastReset)
+  const totalAssigned = currentAllocations.reduce((sum, allocation) => sum + (allocation.amount || 0), 0)
   const target = budget?.target || 0
   const progress = target > 0 ? Math.min((totalAssigned / target) * 100, 100) : 0
   const remaining = Math.max(target - totalAssigned, 0)
-  const sortedMovements = [...allocations].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  
+  const filteredMovements = useMemo(() => {
+    let result = [...allocations]
+    
+    if (searchMovements) {
+      const lowerSearch = searchMovements.toLowerCase()
+      result = result.filter(m => (m.wallets?.name || '').toLowerCase().includes(lowerSearch))
+    }
+
+    result.sort((a, b) => {
+      let comparison = 0
+      if (sortField === 'date') {
+        comparison = new Date(a.created_at) - new Date(b.created_at)
+      } else if (sortField === 'amount') {
+        comparison = (a.amount || 0) - (b.amount || 0)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return result
+  }, [allocations, searchMovements, sortField, sortOrder])
+
   const sortedEditEvents = [...budgetEvents].sort((a, b) => new Date(b.changed_at) - new Date(a.changed_at))
 
   const getChangeLines = (event) => {
@@ -64,11 +93,24 @@ export default function BudgetDetail({ budget, allocations, onBack, onEdit }) {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <IconGlyph value={budget.icon} fallback="piggy-bank" className="h-5 w-5" />
-            </span>
-            {budget.name}
+          <CardTitle className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <IconGlyph value={budget.icon} fallback="piggy-bank" className="h-5 w-5" />
+              </span>
+              {budget.name}
+            </div>
+            {budget.reset_period && budget.reset_period !== 'none' && (
+              <div className="text-right">
+                <span className="inline-flex items-center rounded-full bg-secondary/20 px-2.5 py-0.5 text-xs font-bold text-secondary-foreground uppercase tracking-tight">
+                  Reinicio {budget.reset_period === 'monthly' ? 'Mensual' : 
+                          budget.reset_period === 'weekly' ? 'Semanal' : 'Anual'}
+                </span>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Último reinicio: {formatDate(budget.last_reset_at)}
+                </p>
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -99,21 +141,76 @@ export default function BudgetDetail({ budget, allocations, onBack, onEdit }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Historial de movimientos del presupuesto</CardTitle>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Historial de movimientos</CardTitle>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                placeholder="Buscar billetera..."
+                value={searchMovements}
+                onChange={e => setSearchMovements(e.target.value)}
+                className="w-full sm:w-48 h-9 text-sm"
+              />
+              <div className="flex gap-1">
+                <Select value={sortField} onValueChange={setSortField}>
+                  <SelectTrigger className="w-28 h-9 text-sm">
+                    <SelectValue placeholder="Ordenar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Fecha</SelectItem>
+                    <SelectItem value="amount">Monto</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="h-9 w-9 p-0"
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </Button>
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {sortedMovements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aún no hay asignaciones para este presupuesto.</p>
+          {filteredMovements.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No se encontraron movimientos.</p>
           ) : (
             <div className="space-y-3">
-              {sortedMovements.map((movement) => (
-                <article key={movement.id} className="rounded-lg border border-border p-3 sm:p-4">
+              {filteredMovements.map((movement) => (
+                <article key={movement.id} className="rounded-lg border border-border p-3 sm:p-4 hover:border-primary/30 transition-colors">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Asignación desde {movement.wallets?.name || 'Billetera'}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{formatDate(movement.created_at)}</p>
+                    <div className="flex items-start gap-3">
+                      <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground shrink-0">
+                        <User className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">Asignación desde {movement.wallets?.name || 'Billetera'}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-xs text-muted-foreground">{formatDate(movement.created_at)}</span>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <span className="text-xs font-medium text-foreground italic flex items-center gap-1">
+                            Por: {movement.author?.name || 'Sistema'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-sm font-bold text-primary">+{formatCOP(movement.amount || 0)}</span>
+                    
+                    <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
+                      <span className="text-sm font-bold text-primary">+{formatCOP(movement.amount || 0)}</span>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          if (window.confirm('¿Seguro que quieres eliminar esta asignación? El saldo volverá a la billetera.')) {
+                            onDeleteAllocation?.(movement.id)
+                          }
+                        }}
+                        className="h-8 w-8 p-0 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </article>
               ))}

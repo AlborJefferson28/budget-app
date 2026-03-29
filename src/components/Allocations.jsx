@@ -13,8 +13,7 @@ import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } 
 import { accountTransfersService, walletsService } from '../services';
 import { IconGlyph } from '../lib/icons';
 import { AllocationsSkeleton } from './RouteSkeletons';
-
-const QUICK_AMOUNT_STEPS = [10000, 50000, 100000];
+import { AmountInput } from './ui/AmountInput';
 
 const getErrorMessage = (error, fallback) => {
   if (!error) return fallback;
@@ -54,11 +53,14 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
   const [amountInput, setAmountInput] = useState('0');
   const [search, setSearch] = useState('');
   const [page, setPageNum] = useState(1);
+  const [sortField, setSortField] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [walletFilter, setWalletFilter] = useState('all');
+  const [budgetFilter, setBudgetFilter] = useState('all');
   const [personalFundingWallets, setPersonalFundingWallets] = useState([]);
   const [fundingLoading, setFundingLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [viewingAllocation, setViewingAllocation] = useState(null);
-  const [amountAdjustMode, setAmountAdjustMode] = useState('add');
   const [idempotencyKey, setIdempotencyKey] = useState('');
   const [contributionIdempotencyKey, setContributionIdempotencyKey] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -135,13 +137,41 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
 
   // Filtros y paginación
   const filtered = useMemo(() => {
-    if (!search) return allocations;
-    return allocations.filter(a => {
-      const wallet = a.wallets?.name?.toLowerCase() || '';
-      const budget = a.budgets?.name?.toLowerCase() || '';
-      return wallet.includes(search.toLowerCase()) || budget.includes(search.toLowerCase());
+    let result = [...allocations];
+
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      result = result.filter(a => {
+        const wallet = a.wallets?.name?.toLowerCase() || '';
+        const budget = a.budgets?.name?.toLowerCase() || '';
+        return wallet.includes(lowerSearch) || budget.includes(lowerSearch);
+      });
+    }
+
+    if (walletFilter !== 'all') {
+      result = result.filter(a => a.wallet_id === walletFilter);
+    }
+
+    if (budgetFilter !== 'all') {
+      result = result.filter(a => a.budget_id === budgetFilter);
+    }
+
+    result.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'date') {
+        comparison = new Date(b.created_at) - new Date(a.created_at);
+      } else if (sortField === 'amount') {
+        comparison = (b.amount || 0) - (a.amount || 0);
+      } else if (sortField === 'wallet') {
+        comparison = (a.wallets?.name || '').localeCompare(b.wallets?.name || '');
+      } else if (sortField === 'budget') {
+        comparison = (a.budgets?.name || '').localeCompare(b.budgets?.name || '');
+      }
+      return sortOrder === 'desc' ? comparison : -comparison;
     });
-  }, [allocations, search]);
+
+    return result;
+  }, [allocations, search, walletFilter, budgetFilter, sortField, sortOrder]);
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -318,7 +348,6 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
 
     setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
     setAmountInput('0');
-    setAmountAdjustMode('add');
     setShowForm(false);
     await refetchWallets();
   };
@@ -335,14 +364,19 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
     }
   };
 
-  const applyAmountQuickDelta = (delta) => {
-    const nextValue = Math.max(0, normalizeCOPAmount(amountInput) + delta);
-    setAmountInput(formatCOPInput(nextValue));
-  };
 
-  const applyAmountStepByMode = (step) => {
-    const sign = amountAdjustMode === 'add' ? 1 : -1;
-    applyAmountQuickDelta(step * sign);
+
+  const handlePayAll = () => {
+    if (selectedBudgetRemaining === null) return;
+    
+    let maxToPay = selectedBudgetRemaining;
+    if (formData.funding_wallet_id && selectedFundingWalletAvailable !== null) {
+      maxToPay = Math.min(maxToPay, selectedFundingWalletAvailable);
+    } else if (selectedWalletAvailable !== null) {
+      maxToPay = Math.min(maxToPay, selectedWalletAvailable);
+    }
+    
+    setAmountInput(formatCOPInput(Math.max(0, maxToPay)));
   };
 
   const handleViewAllocation = (allocation) => {
@@ -377,7 +411,6 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
   const openCreateForm = () => {
     setFormError('');
     setAmountInput('0');
-    setAmountAdjustMode('add');
     setFormData({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
     setIdempotencyKey(crypto.randomUUID());
     setContributionIdempotencyKey(crypto.randomUUID());
@@ -399,16 +432,66 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="mb-4">
-        <Input
-          type="text"
-          placeholder="Buscar asignaciones, billeteras..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPageNum(1); }}
-          className="max-w-md w-full"
-        />
+      {/* Filtros y Ordenamiento */}
+      <div className="flex flex-col lg:flex-row gap-4 mb-6">
+        <div className="flex-1 min-w-[200px]">
+          <Input
+            type="text"
+            placeholder="Buscar por texto..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPageNum(1); }}
+            className="w-full"
+          />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Select value={walletFilter} onValueChange={v => { setWalletFilter(v); setPageNum(1); }}>
+            <SelectTrigger className="w-full md:w-[150px]">
+              <SelectValue placeholder="Billetera" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las wallets</SelectItem>
+              {wallets.map(w => (
+                <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={budgetFilter} onValueChange={v => { setBudgetFilter(v); setPageNum(1); }}>
+            <SelectTrigger className="w-full md:w-[150px]">
+              <SelectValue placeholder="Presupuesto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los budgets</SelectItem>
+              {budgets.map(b => (
+                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sortField} onValueChange={v => { setSortField(v); setPageNum(1); }}>
+            <SelectTrigger className="w-full md:w-[130px]">
+              <SelectValue placeholder="Ordenar por" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date">Fecha</SelectItem>
+              <SelectItem value="amount">Monto</SelectItem>
+              <SelectItem value="wallet">Billetera</SelectItem>
+              <SelectItem value="budget">Presupuesto</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={sortOrder} onValueChange={v => { setSortOrder(v); setPageNum(1); }}>
+            <SelectTrigger className="w-full md:w-[110px]">
+              <SelectValue placeholder="Orden" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">Desc (↓)</SelectItem>
+              <SelectItem value="asc">Asc (↑)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
       <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
         Los movimientos de asignación son de solo lectura. Solo puedes visualizar su detalle.
       </div>
@@ -455,8 +538,8 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                   <p className="text-xs text-muted-foreground">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</p>
                 </div>
                 <div className="pt-1 flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => handleViewAllocation(allocation)} className="flex-1">Ver</Button>
-                  <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10">Eliminar</Button>
+                  <Button size="sm" variant="outline" type="button" onClick={() => handleViewAllocation(allocation)} className="flex-1">Ver</Button>
+                  <Button size="sm" variant="outline" type="button" onClick={() => handleDelete(allocation.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10">Eliminar</Button>
                 </div>
               </div>
             ))}
@@ -515,10 +598,10 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS[getStatus(idx)].color}`}>{STATUS[getStatus(idx)].label}</span>
                     </td>
                     <td className="py-3 px-6 flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleViewAllocation(allocation)}>
+                      <Button size="sm" variant="outline" type="button" onClick={() => handleViewAllocation(allocation)}>
                         Ver
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                      <Button size="sm" variant="outline" type="button" onClick={() => handleDelete(allocation.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10">
                         Eliminar
                       </Button>
                     </td>
@@ -676,7 +759,7 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
             </div>
             <div className="mb-6">
               <label className="block text-sm mb-1">Monto</label>
-              <Input
+              <AmountInput
                 type="text"
                 numeric
                 placeholder="Monto"
@@ -690,48 +773,23 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                 onBlur={() => {
                   setAmountInput(formatCOPInput(amountInput));
                 }}
+                onStep={(val) => {
+                  setAmountInput(formatCOPInput(val));
+                }}
                 required
                 min={1}
               />
               <div className="mt-2 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1">
                   <Button
                     type="button"
-                    variant={amountAdjustMode === 'add' ? 'default' : 'outline'}
+                    variant="secondary"
                     size="sm"
-                    className={amountAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
-                    onClick={() => setAmountAdjustMode('add')}
+                    className="font-semibold text-xs border border-secondary"
+                    onClick={handlePayAll}
                   >
-                    Sumar
+                    Pagar todo / Pagar lo faltante
                   </Button>
-                  <Button
-                    type="button"
-                    variant={amountAdjustMode === 'subtract' ? 'destructive' : 'outline'}
-                    size="sm"
-                    className={amountAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
-                    onClick={() => setAmountAdjustMode('subtract')}
-                  >
-                    Restar
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  {QUICK_AMOUNT_STEPS.map((quickAmount) => (
-                    <Button
-                      key={`alloc-step-${quickAmount}`}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className={`justify-start ${
-                        amountAdjustMode === 'add'
-                          ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
-                          : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
-                      }`}
-                      onClick={() => applyAmountStepByMode(quickAmount)}
-                    >
-                      {amountAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
-                    </Button>
-                  ))}
                 </div>
               </div>
               {selectedBudgetRemaining !== null && previewAllocationAmount > selectedBudgetRemaining && (

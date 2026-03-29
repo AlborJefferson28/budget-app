@@ -7,8 +7,7 @@ import { Input } from './ui/Input'
 import { Select, SelectContent, SelectEmpty, SelectItem, SelectTrigger, SelectValue } from './ui/Select'
 import { formatCOP, formatCOPInput, formatCOPInputFromRaw, normalizeCOPAmount } from '../lib/currency'
 import { IconGlyph } from '../lib/icons'
-
-const QUICK_AMOUNT_STEPS = [10000, 50000, 100000]
+import { AmountInput } from './ui/AmountInput'
 
 const toDateInput = (value) => {
   if (!value) return ''
@@ -56,7 +55,6 @@ export default function WalletMovementModal({
   onSuccess,
 }) {
   const [formData, setFormData] = useState(buildInitialForm(defaultType, initialWalletId, wallets))
-  const [amountAdjustMode, setAmountAdjustMode] = useState('add')
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showCategoryMenu, setShowCategoryMenu] = useState(false)
@@ -65,7 +63,6 @@ export default function WalletMovementModal({
   useEffect(() => {
     if (!open) return
     setFormData(buildInitialForm(defaultType, initialWalletId, wallets))
-    setAmountAdjustMode('add')
     setFormError('')
     setSubmitting(false)
     setShowCategoryMenu(false)
@@ -119,15 +116,7 @@ export default function WalletMovementModal({
   const isIncome = formData.type === 'income'
   const modalTitle = isIncome ? 'Registrar ingreso' : 'Registrar gasto'
 
-  const applyAmountQuickDelta = (delta) => {
-    const nextValue = Math.max(0, normalizeCOPAmount(formData.amount) + delta)
-    setFormData(prev => ({ ...prev, amount: formatCOPInput(nextValue) }))
-  }
 
-  const applyAmountStepByMode = (step) => {
-    const sign = amountAdjustMode === 'add' ? 1 : -1
-    applyAmountQuickDelta(step * sign)
-  }
 
   const applyCategorySelection = (value) => {
     setFormData(prev => ({ ...prev, category: value }))
@@ -342,7 +331,7 @@ export default function WalletMovementModal({
               required
             />
 
-            <Input
+            <AmountInput
               type="text"
               numeric
               placeholder="Monto"
@@ -358,50 +347,11 @@ export default function WalletMovementModal({
               onBlur={() => {
                 setFormData(prev => ({ ...prev, amount: formatCOPInput(prev.amount) }))
               }}
+              onStep={(val) => {
+                setFormData(prev => ({ ...prev, amount: formatCOPInput(val) }))
+              }}
               required
             />
-
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Ajuste rápido</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={amountAdjustMode === 'add' ? 'default' : 'outline'}
-                  size="sm"
-                  className={amountAdjustMode === 'add' ? '' : 'border-primary/40 text-primary hover:bg-primary/10 hover:text-primary'}
-                  onClick={() => setAmountAdjustMode('add')}
-                >
-                  Sumar
-                </Button>
-                <Button
-                  type="button"
-                  variant={amountAdjustMode === 'subtract' ? 'destructive' : 'outline'}
-                  size="sm"
-                  className={amountAdjustMode === 'subtract' ? '' : 'border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'}
-                  onClick={() => setAmountAdjustMode('subtract')}
-                >
-                  Restar
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {QUICK_AMOUNT_STEPS.map((quickAmount) => (
-                  <Button
-                    key={`movement-step-${quickAmount}`}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={`justify-start ${
-                      amountAdjustMode === 'add'
-                        ? 'border-primary/50 text-primary hover:bg-primary/10 hover:text-primary'
-                        : 'border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive'
-                    }`}
-                    onClick={() => applyAmountStepByMode(quickAmount)}
-                  >
-                    {amountAdjustMode === 'add' ? '+' : '-'} {formatCOP(quickAmount)}
-                  </Button>
-                ))}
-              </div>
-            </div>
 
             {!isIncome && selectedWallet && previewAmount > normalizeCOPAmount(selectedWallet.balance) && (
               <p className="text-xs text-destructive">

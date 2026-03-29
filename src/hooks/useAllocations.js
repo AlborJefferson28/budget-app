@@ -30,6 +30,14 @@ export const useAllocations = (accountId) => {
     return { data, error }
   }
 
+  const createAllocationsBulk = async (allocations) => {
+    const { data, error } = await allocationsService.create(allocations)
+    if (!error) {
+      await fetchAllocations()
+    }
+    return { data, error }
+  }
+
   const updateAllocation = async (id, updates) => {
     const { data, error } = await allocationsService.update(id, updates)
     if (!error) {
@@ -39,7 +47,7 @@ export const useAllocations = (accountId) => {
   }
 
   const deleteAllocation = async (id) => {
-    const error = await allocationsService.delete(id)
+    const { error } = await allocationsService.delete(id)
     if (!error) {
       setAllocations(prev => prev.filter(a => a.id !== id))
     }
@@ -51,6 +59,7 @@ export const useAllocations = (accountId) => {
     loading,
     error,
     createAllocation,
+    createAllocationsBulk,
     updateAllocation,
     deleteAllocation,
     refetch: fetchAllocations,
