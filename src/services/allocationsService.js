@@ -4,7 +4,7 @@ export const allocationsService = {
   async getByAccount(accountId) {
     const { data, error } = await supabase
       .from('allocations')
-      .select('*, wallets!inner(name, account_id), budgets!inner(name, account_id)')
+      .select('*, wallets!inner(name, account_id), budgets!inner(name, account_id), profiles(name)')
       .eq('wallets.account_id', accountId)
       .eq('budgets.account_id', accountId)
     return { data, error }

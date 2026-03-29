@@ -46,8 +46,8 @@ function getStatus(idx) {
 export default function Allocations({ accountId, setPage, setSelectedWalletDetailId, setSelectedBudgetDetailId, setSelectedAccount }) {
   const { user } = useAuth();
   const { accounts } = useAccounts();
-  const { allocations, loading, error, createAllocation } = useAllocations(accountId);
-  const { wallets } = useWallets(accountId);
+  const { allocations, loading, error, createAllocation, deleteAllocation } = useAllocations(accountId);
+  const { wallets, refetch: refetchWallets } = useWallets(accountId);
   const { budgets } = useBudgets(accountId);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ wallet_id: '', budget_id: '', amount: 0, funding_wallet_id: '' });
@@ -303,6 +303,7 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
       budget_id: formData.budget_id,
       amount,
       idempotency_key: idempotencyKey,
+      created_by: user?.id,
     });
     setSubmitting(false);
 
@@ -319,6 +320,19 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
     setAmountInput('0');
     setAmountAdjustMode('add');
     setShowForm(false);
+    await refetchWallets();
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('¿Estás seguro de eliminar esta asignación? El monto será devuelto a la billetera original.')) {
+      const { error: deleteError } = await deleteAllocation(id);
+      if (deleteError) {
+        alert(getErrorMessage(deleteError, 'No fue posible eliminar la asignación.'));
+      } else {
+        setViewingAllocation(null);
+        await refetchWallets();
+      }
+    }
   };
 
   const applyAmountQuickDelta = (delta) => {
@@ -440,8 +454,9 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                   </div>
                   <p className="text-xs text-muted-foreground">{allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : ''}</p>
                 </div>
-                <div className="pt-1">
-                  <Button size="sm" variant="outline" onClick={() => handleViewAllocation(allocation)} className="w-full">Ver movimiento</Button>
+                <div className="pt-1 flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => handleViewAllocation(allocation)} className="flex-1">Ver</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10">Eliminar</Button>
                 </div>
               </div>
             ))}
@@ -501,7 +516,10 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                     </td>
                     <td className="py-3 px-6 flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => handleViewAllocation(allocation)}>
-                        Ver movimiento
+                        Ver
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleDelete(allocation.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                        Eliminar
                       </Button>
                     </td>
                   </tr>
@@ -767,7 +785,16 @@ export default function Allocations({ accountId, setPage, setSelectedWalletDetai
                   {viewingAllocation.created_at ? new Date(viewingAllocation.created_at).toLocaleString('es-CO') : 'Sin fecha'}
                 </p>
               </div>
-              <div className="flex justify-end pt-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Responsable</p>
+                <p className="text-sm text-foreground">
+                  {viewingAllocation.profiles?.name || 'Sistema / Atribuido'}
+                </p>
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <Button type="button" variant="outline" onClick={() => handleDelete(viewingAllocation.id)} className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                  Eliminar
+                </Button>
                 <Button type="button" variant="outline" onClick={closeViewAllocation}>
                   Cerrar
                 </Button>
