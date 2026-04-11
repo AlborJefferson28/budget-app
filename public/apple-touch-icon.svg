@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="Budget App">
+  <rect width="180" height="180" rx="42" fill="#111111" />
+  <circle cx="90" cy="90" r="56" fill="#7acd16" />
+  <path d="M79 66h25a19 19 0 1 1 0 38H84v26h-11V66h6zm5 11v16h20a8 8 0 1 0 0-16H84z" fill="#0a0a0a"/>
+</svg>
